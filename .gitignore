@@ -1,0 +1,25 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+
+# PyCharm / VSCode settings
+.idea/
+.vscode/
+
+# User Data (САМОЕ ВАЖНОЕ)
+profiles/*.json
+!profiles/.gitkeep
+
+# App Data (Настройки, БД, Пресеты)
+data/*.json
+data/*.db
+!data/.gitkeep
+
+# Logs
+logs/*.txt
+!logs/.gitkeep
+
+# Screenshots (from diagnostics)
+*.png

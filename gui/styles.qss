@@ -1,0 +1,294 @@
+/* gui/styles.qss - Final Polish v5 */
+
+/* === ГЛОБАЛЬНЫЕ === */
+QMainWindow {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #181825, stop:1 #1e1e2e);
+}
+
+QWidget {
+    font-family: "Segoe UI", "Roboto", sans-serif;
+    font-size: 14px;
+    color: #cdd6f4;
+}
+
+/* === МЕНЮ СЛЕВА === */
+QListWidget {
+    background-color: rgba(24, 24, 37, 0.5);
+    border-right: 1px solid #313244;
+    outline: none;
+    font-size: 16px;
+    font-weight: 800;
+    padding-top: 20px;
+}
+
+QListWidget::item {
+    height: 55px;
+    padding-left: 20px;
+    margin: 6px 12px;
+    border-radius: 12px;
+    color: #a6adc8;
+}
+
+/* Фикс: при наведении на ВЫБРАННЫЙ элемент цвет не меняется */
+QListWidget::item:selected {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #cba6f7, stop:1 #89b4fa);
+    color: #11111b;
+    font-weight: bold;
+}
+
+QListWidget::item:selected:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #cba6f7, stop:1 #89b4fa);
+    color: #11111b;
+}
+
+QListWidget::item:hover {
+    background-color: rgba(137, 180, 250, 0.1);
+    color: #ffffff;
+}
+
+/* === ГРУППЫ (БЛОКИ) === */
+QGroupBox {
+    /* Рамка вокруг всего блока - ЕСТЬ */
+    border: 1px solid #45475a;
+    border-radius: 12px;
+    margin-top: 35px; /* Отступ под большой заголовок */
+    padding-top: 10px;
+    background-color: rgba(30, 30, 46, 0.3);
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 20px;
+    padding: 0px 5px;
+
+    /* Текст заголовка */
+    color: #89b4fa;
+    font-weight: 900; /* Очень жирный */
+    font-size: 16px;  /* Крупный */
+
+    /* Убираем рамку у самого текста заголовка */
+    background-color: transparent;
+    border: none;
+}
+
+/* === ПОЛЯ ВВОДА === */
+QLineEdit, QTextEdit, QPlainTextEdit {
+    background-color: #313244;
+    border: 1px solid #7f849c;
+    border-radius: 10px;
+    padding: 8px 12px;
+    color: #cdd6f4;
+}
+
+QLineEdit:focus, QTextEdit:focus {
+    border: 2px solid #89b4fa;
+    background-color: #3b3e52;
+}
+
+/* === ВЫПАДАЮЩИЕ СПИСКИ === */
+QComboBox {
+    background-color: #313244;
+    border: 1px solid #7f849c;
+    border-radius: 10px;
+    padding: 6px 12px;
+    color: #cdd6f4;
+    min-height: 25px;
+}
+
+QComboBox:focus, QComboBox:on {
+    border: 2px solid #89b4fa;
+}
+
+/* Убираем стили внутреннего поля */
+QComboBox QLineEdit {
+    background: transparent;
+    border: none;
+    padding: 0px;
+    margin-right: 30px;
+}
+
+/* Кнопка раскрытия */
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 30px;
+    border: none;
+    background: transparent;
+}
+
+QComboBox::down-arrow { image: none; } /* Стрелка рисуется через виджет */
+
+/* === ВЫПАДАЮЩЕЕ МЕНЮ (ИСПРАВЛЕНИЕ ЧЕРНОГО ТЕКСТА) === */
+QComboBox QAbstractItemView {
+    background-color: #11111b;
+    border: 1px solid #7f849c;
+    border-radius: 8px;
+    color: #cdd6f4;
+    selection-background-color: #89b4fa;
+    selection-color: #1e1e2e;
+    outline: none;
+    padding: 5px;
+}
+
+QComboBox QAbstractItemView::item {
+    min-height: 35px;
+    padding-left: 5px;
+    border-radius: 4px;
+}
+
+/* При наведении */
+QComboBox QAbstractItemView::item:hover {
+    background-color: rgba(137, 180, 250, 0.15);
+    color: white; /* ЯВНО БЕЛЫЙ ЦВЕТ */
+}
+
+/* Выбранный элемент (исправление бага с черным текстом) */
+QComboBox QAbstractItemView::item:selected {
+    background-color: #313244; /* Темно-синий фон */
+    color: white; /* ЯВНО БЕЛЫЙ ЦВЕТ */
+}
+
+/* Квадратик галочки */
+QComboBox QAbstractItemView::indicator {
+    width: 18px;
+    height: 18px;
+    background-color: transparent;
+    border: 2px solid #a6adc8;
+    border-radius: 6px;
+    margin-right: 10px;
+}
+
+/* Подсветка квадратика при наведении */
+QComboBox QAbstractItemView::indicator:hover {
+    border: 3px solid #89b4fa; /* Синяя рамка при наведении */
+    background-color: rgba(137, 180, 250, 0.1);
+}
+
+/* Выбранный квадратик */
+QComboBox QAbstractItemView::indicator:checked {
+    background-color: #89b4fa;
+    border: 1px solid #89b4fa;
+    image: url(resources/icons/check.svg);
+}
+
+/* === КНОПКИ === */
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #89b4fa, stop:1 #cba6f7);
+    color: #1e1e2e;
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-weight: 800;
+    border: none;
+}
+QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #b4befe, stop:1 #f5c2e7); }
+QPushButton:pressed { background: #74c7ec; margin-top: 2px; }
+
+QPushButton[text="Удалить"], QPushButton[text="Удалить профиль"], QPushButton[text="Удалить пресет"] {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f38ba8, stop:1 #fab387);
+    color: #1e1e2e;
+}
+QPushButton[text="Удалить"]:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #eba0ac, stop:1 #f9e2af);
+}
+QPushButton[text="Удалить профиль"], QPushButton[text="Удалить профиль"], QPushButton[text="Удалить пресет"] {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f38ba8, stop:1 #fab387);
+    color: #1e1e2e;
+}
+QPushButton[text="Удалить профиль"]:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #eba0ac, stop:1 #f9e2af);
+}
+
+QPushButton[text="Сохранить"] {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #89dceb, stop:1 #a6e3a1);
+    color: #1e1e2e;
+}
+QPushButton[text="Сохранить"]:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #89dceb, stop:1 #f9e2af);
+}
+
+
+/* === SPINBOX (ЦИФРЫ СО СТРЕЛКАМИ) === */
+QSpinBox, QDoubleSpinBox {
+    background-color: #313244;
+    border: 1px solid #7f849c;
+    border-radius: 10px;
+    padding: 6px 10px;
+}
+
+QSpinBox::up-button, QDoubleSpinBox::up-button {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 25px;
+    border-left: 1px solid #585b70;
+    border-top-right-radius: 10px;
+    background: transparent;
+    margin-bottom: 0px;
+}
+
+QSpinBox::down-button, QDoubleSpinBox::down-button {
+    subcontrol-origin: border;
+    subcontrol-position: bottom right;
+    width: 25px;
+    border-left: 1px solid #585b70;
+    border-bottom-right-radius: 10px;
+    background: transparent;
+    margin-top: 0px;
+}
+
+/* Картинки стрелок */
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+    image: url(resources/icons/arrow_up.svg);
+    width: 10px; height: 10px;
+}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+    image: url(resources/icons/arrow_down.svg);
+    width: 10px; height: 10px;
+}
+
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background-color: rgba(255,255,255,0.1);
+}
+
+/* Скролл и Лог */
+QTextEdit[readOnly="true"] {
+    background-color: #11111b;
+    border: 1px solid #45475a;
+    border-radius: 8px;
+}
+
+
+/* === ОБЫЧНЫЕ ЧЕКБОКСЫ (Настройки, Активность) === */
+QCheckBox {
+    spacing: 12px; /* Отступ от текста */
+    color: #cdd6f4;
+    font-size: 14px;
+}
+/* Квадратик чекбокса */
+QCheckBox::indicator {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px; /* Скругление */
+    border: 2px solid #585b70; /* Рамка */
+    background-color: rgba(0,0,0,0.3); /* Темный фон */
+}
+
+/* При наведении */
+QCheckBox::indicator:hover {
+    border: 2px solid #89b4fa; /* Синяя рамка */
+    background-color: rgba(137, 180, 250, 0.1);
+}
+
+/* Когда выбрано (Галочка) */
+QCheckBox::indicator:checked {
+    background-color: #89b4fa; /* Заливка */
+    border: 2px solid #89b4fa;
+    /* Иконка галочки (та же, что и в списке) */
+    image: url(resources/icons/check.svg);
+}
+
+
+
+QScrollBar:vertical { background: transparent; width: 8px; margin: 0px; }
+QScrollBar::handle:vertical { background: #585b70; border-radius: 4px; min-height: 20px; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }

@@ -1,0 +1,27 @@
+{
+  "search_page": {
+    "vacancy_card": "[data-qa='vacancy-serp__vacancy']",
+    "apply_button": "[data-qa='vacancy-serp__vacancy_response']",
+    "already_applied": ".vacancy-serp-item__response_already-responded",
+    "pager_next": "[data-qa='pager-next']"
+  },
+  "response_modal": {
+    "dialog": "div[role='dialog']",
+    "add_letter_btn": "[data-qa='add-cover-letter']",
+    "letter_input": "textarea",
+    "submit_btn": "[data-qa='vacancy-response-submit-popup']",
+    "resume_trigger": "[data-qa='resume-title']",
+    "resume_option_text": ".magritte-text_typography-label-2-regular___ia7GB_4-4-2"
+  },
+  "activity": {
+    "chat_open_btn": "[data-qa='chatikActivator-button']",
+    "chat_close_btn": "button[data-qa='chatik-close-chatik']",
+    "chat_iframe": "iframe.chatik-integration-iframe",
+    "chat_list_item": "a[data-qa*='chatik-open-chat-']",
+    "chat_input": "textarea[data-qa='chatik-new-message-text']",
+    "chat_send_btn": "button[data-qa='chatik-do-send-message']",
+    "chat_back_btn": "button[data-qa='chatik-back-to-chats-button']",
+    "resume_update_btn": "button[data-qa*='resume-update-button']",
+    "resume_modal_close": "button[data-qa='bot-update-resume-modal__close-button']"
+  }
+}
