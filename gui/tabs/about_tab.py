@@ -28,7 +28,7 @@ class AboutTab(QWidget):
                 a { color: #89b4fa; text-decoration: none; font-weight: bold; }
             </style>
 
-            <h1>🤖 HH Automation Bot <span style="font-size: 14pt; color: #fab387;">v3.0 Beta</span></h1>
+            <h1>🤖 HH Automation Bot <span style="font-size: 14pt; color: #fab387;">v3.1 Beta</span></h1>
             <p style="font-size: 12pt;">Профессиональный инструмент для автоматизации поиска работы, имитирующий действия реального человека.</p>
 
             <hr style="border: 1px solid #45475a;">

@@ -1,5 +1,5 @@
 {
   "version": "3.1",
-  "download_url": "https://github.com/GNAVA4/HH_Automation_bot/releases",
+  "download_url": "https://github.com/GNAVA4/HH_Automation_bot",
   "release_notes": "<h3>Что нового в версии 3.1:</h3><ul><li>Улучшен алгоритм обхода защиты.</li><li>Добавлены новые фильтры поиска.</li><li>Исправлены баги с вылетами.</li></ul>"
 }

@@ -20,7 +20,7 @@ from gui.tabs.updates_tab import UpdatesTab
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("HH Automation Bot v3.0 beta")
+        self.setWindowTitle("HH Automation Bot v3.1 Beta")
 
         screen = QGuiApplication.primaryScreen().availableGeometry()
         width = int(screen.width() * 0.55)

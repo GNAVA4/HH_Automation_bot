@@ -78,14 +78,14 @@ class ResponseTab(QWidget):
             grid.addWidget(widget, row, col + 1)
 
         self.search_input = QLineEdit();
-        self.search_input.setPlaceholderText("Аналитик")
+        self.search_input.setPlaceholderText("Аналитик данных")
         add_field(0, 0, "Поиск вакансии:", self.search_input)
         self.exclude_input = QLineEdit();
-        self.exclude_input.setPlaceholderText("Сбер, Yandex")
+        self.exclude_input.setPlaceholderText("Например: Сбер, Yandex, Авито, Data Scientist и тд.")
         add_field(0, 2, "Исключить слова:", self.exclude_input)
 
         self.salary_input = QLineEdit();
-        self.salary_input.setPlaceholderText("0")
+        self.salary_input.setPlaceholderText("Не рекомендуется указывать")
         add_field(1, 0, "Доход от (руб):", self.salary_input)
         self.region_combo = AnimatedComboBox()  # Анимированный
         self.region_combo.addItems(
@@ -126,7 +126,7 @@ class ResponseTab(QWidget):
         resp_layout.setContentsMargins(15, 15, 15, 15)
 
         self.resume_input = QLineEdit()
-        self.resume_input.setPlaceholderText("Название резюме")
+        self.resume_input.setPlaceholderText("Название резюме (Обязательно)")
         self.resume_input.setMinimumHeight(45)
         resp_layout.addWidget(QLabel("Резюме:"), 0, 0)
         resp_layout.addWidget(self.resume_input, 0, 1)
