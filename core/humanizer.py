@@ -1,7 +1,8 @@
 import time
 import random
 import math
-
+import logging
+logger = logging.getLogger("HH_Automation_bot")
 
 class HumanLike:
     def __init__(self, page, engine):
@@ -48,7 +49,9 @@ class HumanLike:
                 steps += 1
                 if steps > 50: break
         except Exception as e:
-            if "Stopped" in str(e) or "Target closed" in str(e): raise e
+            # Игнорируем ошибки остановки, остальные логируем как DEBUG (чтобы не спамить)
+            if "Stopped" not in str(e) and "Target closed" not in str(e):
+                logger.debug(f"Human scroll error: {e}")
             try:
                 locator.scroll_into_view_if_needed()
             except:
@@ -81,7 +84,8 @@ class HumanLike:
                     self._sleep(random.uniform(0.3, 0.7))
 
         except Exception as e:
-            if "Stopped" in str(e) or "Target closed" in str(e): raise e
+            if "Stopped" not in str(e) and "Target closed" not in str(e):
+                logger.debug(f"Human type error: {e}")
             locator.fill(text)  # Если не вышло по буквам, вставляем сразу
 
     def human_click(self, locator):
@@ -105,4 +109,5 @@ class HumanLike:
                 self.page.mouse.wheel(0, random.randint(100, 400))
                 self._sleep(random.uniform(0.5, 1.5))
         except Exception as e:
-            if "Stopped" in str(e) or "Target closed" in str(e): raise e
+            if "Stopped" not in str(e) and "Target closed" not in str(e):
+                logger.debug(f"Human click error: {e}")

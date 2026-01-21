@@ -14,12 +14,13 @@ from gui.tabs.about_tab import AboutTab
 
 from core.logger import setup_logger
 from gui.threads import SearchWorker, ActivityWorker
+from gui.tabs.updates_tab import UpdatesTab
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("HH Automation Bot v2.7 alpha")
+        self.setWindowTitle("HH Automation Bot v3.0 beta")
 
         screen = QGuiApplication.primaryScreen().availableGeometry()
         width = int(screen.width() * 0.55)
@@ -39,7 +40,7 @@ class MainWindow(QMainWindow):
         self.sidebar.setFrameShape(QListWidget.Shape.NoFrame)
         self.sidebar.currentRowChanged.connect(self.change_page)
 
-        menu_items = ["Отклики", "Активность", "Статистика", "Настройки", "Диагностика", "О приложении"]
+        menu_items = ["Отклики", "Активность", "Статистика", "Настройки", "Диагностика", "Обновления", "О приложении"]
         for item in menu_items: self.sidebar.addItem(item)
 
         right_widget = QWidget()
@@ -53,6 +54,7 @@ class MainWindow(QMainWindow):
         self.stats_tab = StatsTab()
         self.settings_tab = SettingsTab()
         self.diagnostics_tab = DiagnosticsTab()
+        self.updates_tab = UpdatesTab()
         self.about_tab = AboutTab()
 
         self.pages.addWidget(self.response_tab)
@@ -60,6 +62,7 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(self.stats_tab)
         self.pages.addWidget(self.settings_tab)
         self.pages.addWidget(self.diagnostics_tab)
+        self.pages.addWidget(self.updates_tab)
         self.pages.addWidget(self.about_tab)
 
         right_layout.addWidget(self.pages)

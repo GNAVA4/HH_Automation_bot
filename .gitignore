@@ -1,26 +1,33 @@
-# Python cache
+# === Python & System ===
 __pycache__/
 *.py[cod]
 *$py.class
 venv/
 .venv/
-
-# PyCharm / VSCode settings
 .idea/
 .vscode/
+.DS_Store
 
-# User Data (САМОЕ ВАЖНОЕ)
-profiles/*.json
-!profiles/.gitkeep
+# === Сборка EXE (PyInstaller) ===
+build/
+dist/
+*.spec
 
-# App Data (Настройки, БД, Пресеты)
-data/*.json
-data/*.db
-!data/.gitkeep
+# === Пользовательские данные (Новая структура) ===
+# Мы полностью игнорируем эту папку, так как она создается скриптом
+user_data/
 
-# Logs
-logs/*.txt
-!logs/.gitkeep
+# === Старый мусор (на всякий случай, если остался) ===
+profiles/
+data/
+logs/
+scripts/
+*.log
+*.db
+*.json
+# Но исключаем из игнора наши системные JSON файлы, если они лежат в корне или ресурсах
+!resources/*.json
+!version.json
 
-# Screenshots (from diagnostics)
+# Игнорируем скриншоты диагностики
 *.png

@@ -102,15 +102,16 @@ class LoginWorker(QThread):
         from playwright.sync_api import sync_playwright
 
         logger.info("Запуск мастера авторизации...")
+        logger.info("У вас есть 120 секунд, что бы войти в аккаунт...")
         with sync_playwright() as p:
-            args = ["--start-maximized", "--disable-blink-features=AutomationControlled", "--no-sandbox"]
+            args = ["--disable-blink-features=AutomationControlled", "--no-sandbox"]
             browser = p.chromium.launch(headless=False, args=args, channel="chrome")
 
             context = browser.new_context(viewport=None, device_scale_factor=1)
             page = context.new_page()
 
             success = False
-            msg = "Время вышло (60 сек)."
+            msg = "Время вышло (120 сек)."
 
             try:
                 # 1. Переход (не ждем полной загрузки вечно)
@@ -121,7 +122,7 @@ class LoginWorker(QThread):
 
                 logger.info("Жду входа в аккаунт...")
 
-                # 2. Цикл ожидания входа (60 сек)
+                # 2. Цикл ожидания входа (120 сек)
                 start = time.time()
                 while time.time() - start < 120:
                     if page.is_closed():
@@ -134,12 +135,14 @@ class LoginWorker(QThread):
                         if page.locator("[data-qa='vacancy-serp__vacancy_response']").count() > 0:
                             success = True
                             msg = f"Профиль успешно сохранен: {os.path.basename(self.save_path)}"
+                            logger.info(f"Профиль успешно сохранен: {os.path.basename(self.save_path)}")
                             break
 
                         # Альтернативная проверка: Кнопка "Создать резюме" или "Мои резюме"
                         if page.locator("[data-qa='mainmenu_myResumes']").count() > 0:
                             success = True
                             msg = f"Профиль успешно сохранен!"
+                            logger.info(f"Профиль успешно сохранен: {os.path.basename(self.save_path)}")
                             break
 
                     except:
@@ -155,7 +158,7 @@ class LoginWorker(QThread):
 
                     # Для надежности выведем в консоль, куда сохраняем
                     abs_path = os.path.abspath(self.save_path)
-                    print(f"DEBUG: Saving cookies to {abs_path}")
+                    logger.info(f"Saving cookies to {abs_path}")
 
                     context.storage_state(path=abs_path)
 
@@ -168,3 +171,21 @@ class LoginWorker(QThread):
                 except:
                     pass
                 self.finished_signal.emit(success, msg)
+
+
+class UpdateWorker(QThread):
+    finished_signal = pyqtSignal(dict)  # Возвращает данные json или пустой dict при ошибке
+
+    def run(self):
+        import urllib.request
+        import json
+        from core.config import VERSION_FILE_URL
+
+        try:
+            # Запрос к GitHub (таймаут 5 сек)
+            with urllib.request.urlopen(VERSION_FILE_URL, timeout=5) as url:
+                data = json.loads(url.read().decode())
+                self.finished_signal.emit(data)
+        except Exception as e:
+            logger.error(f"Ошибка проверки обновлений: {e}")
+            self.finished_signal.emit({})

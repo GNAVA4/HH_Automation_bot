@@ -6,7 +6,6 @@ from PyQt6.QtGui import QIcon
 from gui.main_window import MainWindow
 from core.utils import get_resource_path
 
-
 def main():
     os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
     os.environ["QT_SCALE_FACTOR"] = "1"

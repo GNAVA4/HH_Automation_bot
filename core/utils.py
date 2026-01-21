@@ -1,6 +1,7 @@
 import sys
 import os
-
+import logging
+logger = logging.getLogger("HH_Automation_bot")
 
 def get_base_path():
     """Возвращает абсолютный путь к папке приложения."""
@@ -22,7 +23,11 @@ def get_user_data_path(filename=""):
     data_dir = os.path.join(base, "user_data")
 
     if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
+        try:
+            os.makedirs(data_dir)
+            logger.info(f"Создана папка данных: {data_dir}")
+        except OSError as e:
+            logger.error(f"Не удалось создать папку {data_dir}: {e}")
 
     return os.path.join(data_dir, filename)
 
