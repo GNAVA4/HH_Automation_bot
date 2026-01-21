@@ -4,7 +4,7 @@ import logging
 import os
 import time
 
-logger = logging.getLogger("HH_Bot")
+logger = logging.getLogger("HH_Automation_bot")
 
 
 class SearchWorker(QThread):
@@ -150,7 +150,14 @@ class LoginWorker(QThread):
                 if success:
                     # Даем время на запись куки
                     time.sleep(3)
-                    context.storage_state(path=self.save_path)
+                    # Используем переданный save_path, он уже должен быть абсолютным
+                    # (он формируется в settings_tab через get_user_data_path)
+
+                    # Для надежности выведем в консоль, куда сохраняем
+                    abs_path = os.path.abspath(self.save_path)
+                    print(f"DEBUG: Saving cookies to {abs_path}")
+
+                    context.storage_state(path=abs_path)
 
             except Exception as e:
                 msg = f"Ошибка процесса: {e}"

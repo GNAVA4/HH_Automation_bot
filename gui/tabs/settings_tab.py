@@ -5,6 +5,7 @@ from core.settings_manager import SettingsManager
 from gui.threads import LoginWorker
 from gui.custom_widgets import AnimatedComboBox  # Используем красивые списки
 import os
+from core.utils import get_user_data_path
 
 
 class SettingsTab(QWidget):
@@ -189,15 +190,21 @@ class SettingsTab(QWidget):
     def refresh_profiles(self):
         self.profile_combo.blockSignals(True);
         self.profile_combo.clear()
-        if not os.path.exists("profiles"): os.makedirs("profiles")
-        files = [f.replace(".json", "") for f in os.listdir("profiles") if f.endswith(".json")]
-        self.profile_combo.addItems(files);
+        # Получаем путь через утилиту
+        profiles_dir = get_user_data_path("profiles")
+
+        # Создаем список перед использованием
+        files = []
+        if os.path.exists(profiles_dir):
+            files = [f.replace(".json", "") for f in os.listdir(profiles_dir) if f.endswith(".json")]
+
+        self.profile_combo.addItems(files)
         self.profile_combo.blockSignals(False)
 
     def add_profile(self):
         name, ok = QInputDialog.getText(self, "Новый профиль", "Имя:")
         if ok and name:
-            filename = f"profiles/{name}.json"
+            filename = os.path.join(get_user_data_path("profiles"), f"{name}.json")
             if os.path.exists(filename): return QMessageBox.warning(self, "Ошибка", "Существует!")
             self.login_worker = LoginWorker(filename)
             self.login_worker.finished_signal.connect(self.on_login_finished)
@@ -213,7 +220,7 @@ class SettingsTab(QWidget):
     def delete_profile(self):
         name = self.profile_combo.currentText()
         if name and QMessageBox.question(self, "Удаление", f"Удалить {name}?") == QMessageBox.StandardButton.Yes:
-            try:
-                os.remove(f"profiles/{name}.json"); self.refresh_profiles()
+            path = os.path.join(get_user_data_path("profiles"), f"{name}.json")
+            try: os.remove(path); self.refresh_profiles()
             except:
                 pass

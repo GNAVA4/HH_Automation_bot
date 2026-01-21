@@ -1,8 +1,9 @@
 # core/logger.py
 import logging
 import sys
-from PyQt6.QtCore import QObject, pyqtSignal
 import os
+from PyQt6.QtCore import QObject, pyqtSignal
+from core.utils import get_user_data_path
 
 class QLogHandler(logging.Handler, QObject):
     """
@@ -21,31 +22,27 @@ class QLogHandler(logging.Handler, QObject):
         # Отправляем текст в интерфейс
         self.log_signal.emit(msg)
 
-def setup_logger():
-    """
-    Настройка глобального логгера приложения.
-    Возвращает объект logger и handler для подключения к GUI.
-    """
-    logger = logging.getLogger("HH_Bot")
-    logger.setLevel(logging.DEBUG) # Ловим все сообщения (INFO, DEBUG, ERROR)
 
-    # 1. Формат сообщений: [Время] [Уровень]: Сообщение
+def setup_logger():
+    logger = logging.getLogger("HH_Automation_bot")
+    logger.setLevel(logging.DEBUG)
+
     formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s', datefmt='%H:%M:%S')
 
-    # 2. Вывод в консоль (для разработчика)
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    if not os.path.exists("logs"):
-        os.makedirs("logs")
+    # === ИЗМЕНЕНИЕ ЗДЕСЬ ===
+    # Логи сохраняем в AppData/logs
+    log_dir = get_user_data_path("logs")
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
 
-    # 3. Вывод в файл (чтобы история сохранялась)
-    file_handler = logging.FileHandler(os.path.join("logs", "app_log.txt"), encoding='utf-8')
+    file_handler = logging.FileHandler(os.path.join(log_dir, "app_log.txt"), encoding='utf-8')
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
-    # 4. Вывод в GUI (создаем наш кастомный хендлер)
     gui_handler = QLogHandler()
     gui_handler.setFormatter(formatter)
     logger.addHandler(gui_handler)

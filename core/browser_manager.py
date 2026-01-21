@@ -10,7 +10,9 @@ from database.db_manager import DBManager
 from core.settings_manager import SettingsManager
 from core.humanizer import HumanLike
 from core.config import HEADLESS_MODE
-logger = logging.getLogger("HH_Bot")
+from core.utils import get_user_data_path, get_resource_path
+
+logger = logging.getLogger("HH_Automation_bot")
 
 
 class BrowserEngine:
@@ -27,7 +29,8 @@ class BrowserEngine:
         self.db = DBManager()
 
         try:
-            with open("resources/locators.json", "r") as f:
+            # Локаторы вшиты в EXE, берем через get_resource_path
+            with open(get_resource_path("resources/locators.json"), "r") as f:
                 self.locators = json.load(f)
         except:
             self.locators = {}
@@ -93,8 +96,14 @@ class BrowserEngine:
             channel="chrome",
             ignore_default_args=["--enable-automation"]
         )
+        profile_name = self.settings_mgr.get("current_profile")
 
-        state_path = f"profiles/{self.profile_name}.json"
+        # Профили лежат в AppData/profiles
+        profiles_dir = get_user_data_path("profiles")
+        if not os.path.exists(profiles_dir): os.makedirs(profiles_dir)
+
+        state_path = os.path.join(profiles_dir, f"{self.profile_name}.json")
+        state_path = os.path.abspath(state_path)  # На всякий случай нормализуем
 
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
 
@@ -117,6 +126,8 @@ class BrowserEngine:
         if os.path.exists(state_path):
             self.log(f"Загрузка куки: {state_path}")
             context_options["storage_state"] = state_path
+        else:
+            self.log(f"Файл куки не найден: {state_path}", "warning")
 
         self.context = self.browser.new_context(**context_options)
         self.page = self.context.new_page()

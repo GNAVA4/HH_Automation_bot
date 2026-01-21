@@ -2,15 +2,17 @@ import sqlite3
 import logging
 from datetime import datetime
 import os
+from core.utils import get_user_data_path
 
-logger = logging.getLogger("HH_Bot")
+logger = logging.getLogger("HH_Automation_bot")
 
 
 class DBManager:
-    def __init__(self, db_name=os.path.join("data", "hh_bot.db")):
-        self.db_name = db_name
-        if not os.path.exists("data"):
-            os.makedirs("data")
+    def __init__(self, db_name=None):
+        if db_name is None:
+            self.db_name = get_user_data_path("hh_bot.db")
+        else:
+            self.db_name = db_name
         self.init_db()
 
     def init_db(self):

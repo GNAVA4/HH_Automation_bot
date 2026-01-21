@@ -1,52 +1,54 @@
 import sys
 import os
-import ctypes  # <--- Нужна для фикса иконки в панели задач
+import ctypes
 from PyQt6.QtWidgets import QApplication, QStyleFactory
 from PyQt6.QtGui import QIcon
 from gui.main_window import MainWindow
-
-
-def resource_path(relative_path):
-    """Получает путь к ресурсам (работает и при запуске скрипта, и в EXE)"""
-    if hasattr(sys, '_MEIPASS'):
-        return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
+from core.utils import get_resource_path
 
 
 def main():
-    # 1. Настройка масштаба (High DPI)
     os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
     os.environ["QT_SCALE_FACTOR"] = "1"
 
-    # === ВАЖНО: Фикс иконки в панели задач Windows ===
-    # Windows группирует процессы по ID. По умолчанию это "python".
-    # Мы меняем ID на свой уникальный, чтобы Windows считала это отдельной программой.
     if sys.platform == 'win32':
-        myappid = 'mycompany.hhbot.automation.v1'  # Любая уникальная строка
+        myappid = 'mycompany.hhbot.automation.v1'
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
     app = QApplication(sys.argv)
 
-    # 2. Установка иконки
-    icon_path = resource_path("resources/app_icon.ico")
-
+    # Иконка приложения
+    icon_path = get_resource_path("resources/app_icon.ico")
     if os.path.exists(icon_path):
         app_icon = QIcon(icon_path)
-        app.setWindowIcon(app_icon)  # Иконка окна (слева вверху)
-    else:
-        print(f"Иконка не найдена по пути: {icon_path}")
+        app.setWindowIcon(app_icon)
 
-    # 3. Стиль Fusion (Обязательно для вашего CSS!)
     app.setStyle(QStyleFactory.create("Fusion"))
 
     window = MainWindow()
 
-    # Дублируем установку иконки конкретно для главного окна (иногда помогает)
+    # === ФИКС ИКОНОК В QSS ===
+    # Читаем стиль
+    style_path = get_resource_path("gui/styles.qss")
+    if os.path.exists(style_path):
+        with open(style_path, "r", encoding="utf-8") as f:
+            qss_data = f.read()
+
+        # Получаем АБСОЛЮТНЫЙ путь к папке resources
+        # В Windows пути с обратным слэшем, CSS их не любит, меняем на прямой
+        res_dir = get_resource_path("resources").replace("\\", "/")
+
+        # Подменяем относительный путь на абсолютный прямо в тексте стилей
+        # Было: url(resources/icons/...)
+        # Стало: url(C:/Path/To/_internal/resources/icons/...)
+        qss_data = qss_data.replace("url(resources", f"url({res_dir}")
+
+        window.setStyleSheet(qss_data)
+
     if os.path.exists(icon_path):
         window.setWindowIcon(QIcon(icon_path))
 
     window.show()
-
     sys.exit(app.exec())
 
 

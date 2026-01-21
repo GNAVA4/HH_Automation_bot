@@ -1,7 +1,8 @@
 import json
 import os
+from core.utils import get_user_data_path
 
-SETTINGS_FILE = os.path.join("data", "settings.json")
+SETTINGS_FILE = get_user_data_path("settings.json")
 
 DEFAULT_SETTINGS = {
     "current_profile": "",

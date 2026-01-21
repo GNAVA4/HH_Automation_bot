@@ -5,8 +5,9 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QTextEdit, QGridLayout, QInputDialog, QMessageBox, QListView)
 from PyQt6.QtCore import Qt
 from gui.custom_widgets import CheckableComboBox, AnimatedComboBox
+from core.utils import get_user_data_path
 
-PRESETS_FILE = os.path.join("data", "presets.json")
+PRESETS_FILE = get_user_data_path("presets.json")
 
 
 class ResponseTab(QWidget):
@@ -144,15 +145,24 @@ class ResponseTab(QWidget):
         self.start_btn.setMinimumHeight(60)
         main_layout.addWidget(self.start_btn)
 
-    # ... (Остальные методы без изменений)
     def refresh_profiles(self):
         current = self.profile_combo.currentText()
-        self.profile_combo.blockSignals(True);
+        self.profile_combo.blockSignals(True)
         self.profile_combo.clear()
-        if os.path.exists("profiles"):
-            files = [f.replace(".json", "") for f in os.listdir("profiles") if f.endswith(".json")]
-            self.profile_combo.addItems(files)
-        if current in files: self.profile_combo.setCurrentText(current)
+
+        # Используем AppData
+        profiles_dir = get_user_data_path("profiles")
+        if not os.path.exists(profiles_dir):
+            os.makedirs(profiles_dir)
+
+        # Инициализируем список ЗАРАНЕЕ
+        files = []
+        if os.path.exists(profiles_dir):
+            files = [f.replace(".json", "") for f in os.listdir(profiles_dir) if f.endswith(".json")]
+
+        self.profile_combo.addItems(files)
+        if current in files:
+            self.profile_combo.setCurrentText(current)
         self.profile_combo.blockSignals(False)
 
     def collect_data(self):
@@ -183,12 +193,9 @@ class ResponseTab(QWidget):
             self.preset_combo.setCurrentText(name)
 
     def load_presets_list(self):
-        self.preset_combo.blockSignals(True);
-        self.preset_combo.clear();
-        self.preset_combo.addItem("Выберите пресет...")
+        self.preset_combo.blockSignals(True); self.preset_combo.clear(); self.preset_combo.addItem("Выберите пресет...")
         presets = self.get_all_presets()
-        self.preset_combo.addItems(presets.keys());
-        self.preset_combo.blockSignals(False)
+        self.preset_combo.addItems(presets.keys()); self.preset_combo.blockSignals(False)
 
     def get_all_presets(self):
         if not os.path.exists(PRESETS_FILE): return {}

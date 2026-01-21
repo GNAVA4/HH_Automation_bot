@@ -5,6 +5,7 @@ from gui.custom_widgets import AnimatedComboBox
 from gui.threads import ActivityWorker
 import json
 import os
+from core.utils import get_user_data_path
 
 
 class ActivityTab(QWidget):
@@ -128,9 +129,15 @@ class ActivityTab(QWidget):
     def refresh_profiles(self):
         curr = self.profile_combo.currentText()
         self.profile_combo.clear()
-        if os.path.exists("profiles"):
-            files = [f.replace(".json", "") for f in os.listdir("profiles") if f.endswith(".json")]
-            self.profile_combo.addItems(files)
+        # Получаем путь через утилиту
+        profiles_dir = get_user_data_path("profiles")
+
+        # Создаем список перед использованием
+        files = []
+        if os.path.exists(profiles_dir):
+            files = [f.replace(".json", "") for f in os.listdir(profiles_dir) if f.endswith(".json")]
+
+        self.profile_combo.addItems(files)
         if curr in files: self.profile_combo.setCurrentText(curr)
 
     def add_message(self):

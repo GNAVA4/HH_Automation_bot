@@ -19,7 +19,7 @@ from gui.threads import SearchWorker, ActivityWorker
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("HH Automation Bot v2.5 alpha")
+        self.setWindowTitle("HH Automation Bot v2.7 alpha")
 
         screen = QGuiApplication.primaryScreen().availableGeometry()
         width = int(screen.width() * 0.55)
