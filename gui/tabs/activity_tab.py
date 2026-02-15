@@ -60,7 +60,7 @@ class ActivityTab(QWidget):
 
         limits_layout = QHBoxLayout()
         self.spin_employers = QSpinBox()
-        self.spin_employers.setRange(1, 50);
+        self.spin_employers.setRange(1, 1000);
         self.spin_employers.setValue(5)
         self.spin_employers.setMinimumHeight(35)
         self.spin_employers.setMinimumWidth(80)

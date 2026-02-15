@@ -2,10 +2,11 @@ import json
 import os
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QLineEdit, QComboBox, QGroupBox, QScrollArea,
-                             QPushButton, QTextEdit, QGridLayout, QInputDialog, QMessageBox, QListView)
+                             QPushButton, QTextEdit, QGridLayout, QInputDialog, QMessageBox, QCheckBox)
 from PyQt6.QtCore import Qt
 from gui.custom_widgets import CheckableComboBox, AnimatedComboBox
 from core.utils import get_user_data_path
+from core.settings_manager import SettingsManager
 
 PRESETS_FILE = get_user_data_path("presets.json")
 
@@ -21,11 +22,11 @@ class ResponseTab(QWidget):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(15, 15, 15, 15)
         main_layout.setSpacing(15)
+        self.settings_mgr = SettingsManager()
 
-        # 1. Верхняя панель (Центрирование элементов)
+        # 1. Верхняя панель
         top_group = QGroupBox("Запуск")
         top_layout = QHBoxLayout()
-        # Выравнивание содержимого по центру по вертикали
         top_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         self.profile_combo = AnimatedComboBox()
@@ -46,7 +47,6 @@ class ResponseTab(QWidget):
         btn_del.setFixedSize(120, 45)
         btn_del.clicked.connect(self.delete_preset)
 
-        # Добавляем виджеты с выравниванием
         top_layout.addWidget(QLabel("Профиль:"), 0, Qt.AlignmentFlag.AlignVCenter)
         top_layout.addWidget(self.profile_combo, 0, Qt.AlignmentFlag.AlignVCenter)
         top_layout.addSpacing(20)
@@ -81,18 +81,17 @@ class ResponseTab(QWidget):
         self.search_input.setPlaceholderText("Аналитик данных")
         add_field(0, 0, "Поиск вакансии:", self.search_input)
         self.exclude_input = QLineEdit();
-        self.exclude_input.setPlaceholderText("Например: Сбер, Yandex, Авито, Data Scientist и тд.")
+        self.exclude_input.setPlaceholderText("Сбер, Yandex")
         add_field(0, 2, "Исключить слова:", self.exclude_input)
 
         self.salary_input = QLineEdit();
-        self.salary_input.setPlaceholderText("Не рекомендуется указывать")
+        self.salary_input.setPlaceholderText("0")
         add_field(1, 0, "Доход от (руб):", self.salary_input)
-        self.region_combo = AnimatedComboBox()  # Анимированный
+        self.region_combo = AnimatedComboBox()
         self.region_combo.addItems(
             ["Все регионы", "Москва", "Санкт-Петербург", "Екатеринбург", "Новосибирск", "Казань"])
         add_field(1, 2, "Регион:", self.region_combo)
 
-        # Множественные (Checkable)
         self.exp_combo = CheckableComboBox()
         self.exp_combo.addItems({"Нет опыта": "noExperience", "1-3 года": "between1And3", "3-6 лет": "between3And6",
                                  "Более 6 лет": "moreThan6"})
@@ -119,51 +118,44 @@ class ResponseTab(QWidget):
         scroll.setWidget(content)
         main_layout.addWidget(scroll)
 
-        # 3. Резюме (Компактнее сверху)
-        resp_group = QGroupBox("Резюме и сопроводительное письмо")
-        resp_layout = QGridLayout()
-        # Уменьшил верхний отступ до 15 (было 25)
-        resp_layout.setContentsMargins(15, 15, 15, 15)
+        # === 3. БЛОК РЕЗЮМЕ (Отдельно) ===
+        resume_group = QGroupBox("Настройки резюме")
+        resume_layout = QHBoxLayout()
+        resume_layout.setContentsMargins(15, 20, 15, 15)
 
         self.resume_input = QLineEdit()
-        self.resume_input.setPlaceholderText("Название резюме (Обязательно)")
+        self.resume_input.setPlaceholderText("Резюме по умолчанию (напр. Аналитик)")
         self.resume_input.setMinimumHeight(45)
-        resp_layout.addWidget(QLabel("Резюме:"), 0, 0)
-        resp_layout.addWidget(self.resume_input, 0, 1)
+
+        self.check_smart_resume = QCheckBox("Умный подбор")
+        self.check_smart_resume.setToolTip(
+            "Если включено, бот выберет резюме, наиболее похожее на название вакансии.\nЕсли подходящего нет, используется резюме по умолчанию.")
+        self.check_smart_resume.setChecked(self.settings_mgr.get("smart_resume"))
+
+        resume_layout.addWidget(QLabel("Резюме:"))
+        resume_layout.addWidget(self.resume_input, 1)
+        resume_layout.addWidget(self.check_smart_resume)
+
+        resume_group.setLayout(resume_layout)
+        main_layout.addWidget(resume_group)
+
+        # === 4. БЛОК ПИСЬМА (Отдельно) ===
+        letter_group = QGroupBox("Сопроводительное письмо")
+        letter_layout = QVBoxLayout()
+        letter_layout.setContentsMargins(15, 20, 15, 15)
 
         self.letter_edit = QTextEdit()
-        self.letter_edit.setPlaceholderText("Здравствуйте! {vacancy}...")
+        self.letter_edit.setPlaceholderText("Здравствуйте! Меня заинтересовала вакансия {vacancy} в {company}...")
         self.letter_edit.setMaximumHeight(60)
-        resp_layout.addWidget(QLabel("Текст:"), 1, 0)
-        resp_layout.addWidget(self.letter_edit, 1, 1)
+        letter_layout.addWidget(self.letter_edit)
 
-        resp_group.setLayout(resp_layout)
-        main_layout.addWidget(resp_group)
+        letter_group.setLayout(letter_layout)
+        main_layout.addWidget(letter_group)
 
-        # 4. Кнопка
+        # 5. Кнопка
         self.start_btn = QPushButton("ЗАПУСТИТЬ РАССЫЛКУ")
         self.start_btn.setMinimumHeight(60)
         main_layout.addWidget(self.start_btn)
-
-    def refresh_profiles(self):
-        current = self.profile_combo.currentText()
-        self.profile_combo.blockSignals(True)
-        self.profile_combo.clear()
-
-        # Используем AppData
-        profiles_dir = get_user_data_path("profiles")
-        if not os.path.exists(profiles_dir):
-            os.makedirs(profiles_dir)
-
-        # Инициализируем список ЗАРАНЕЕ
-        files = []
-        if os.path.exists(profiles_dir):
-            files = [f.replace(".json", "") for f in os.listdir(profiles_dir) if f.endswith(".json")]
-
-        self.profile_combo.addItems(files)
-        if current in files:
-            self.profile_combo.setCurrentText(current)
-        self.profile_combo.blockSignals(False)
 
     def collect_data(self):
         return {
@@ -178,9 +170,24 @@ class ResponseTab(QWidget):
             "education": self.edu_combo.get_checked_data(),
             "label": self.other_combo.get_checked_data(),
             "resume_name": self.resume_input.text(),
+            "smart_resume": self.check_smart_resume.isChecked(),  # НОВЫЙ ФЛАГ
             "cover_letter": self.letter_edit.toPlainText(),
             "profile": self.profile_combo.currentText()
         }
+
+    # ... (Остальные методы refresh_profiles, save_preset и т.д. без изменений, скопируй их) ...
+    def refresh_profiles(self):
+        current = self.profile_combo.currentText()
+        self.profile_combo.blockSignals(True);
+        self.profile_combo.clear()
+        profiles_dir = get_user_data_path("profiles")
+        if not os.path.exists(profiles_dir): os.makedirs(profiles_dir)
+        files = []
+        if os.path.exists(profiles_dir):
+            files = [f.replace(".json", "") for f in os.listdir(profiles_dir) if f.endswith(".json")]
+        self.profile_combo.addItems(files)
+        if current in files: self.profile_combo.setCurrentText(current)
+        self.profile_combo.blockSignals(False)
 
     def save_preset(self):
         name, ok = QInputDialog.getText(self, "Сохранение", "Название пресета:")
@@ -193,14 +200,18 @@ class ResponseTab(QWidget):
             self.preset_combo.setCurrentText(name)
 
     def load_presets_list(self):
-        self.preset_combo.blockSignals(True); self.preset_combo.clear(); self.preset_combo.addItem("Выберите пресет...")
+        self.preset_combo.blockSignals(True);
+        self.preset_combo.clear();
+        self.preset_combo.addItem("Выберите пресет...")
         presets = self.get_all_presets()
-        self.preset_combo.addItems(presets.keys()); self.preset_combo.blockSignals(False)
+        self.preset_combo.addItems(presets.keys());
+        self.preset_combo.blockSignals(False)
 
     def get_all_presets(self):
         if not os.path.exists(PRESETS_FILE): return {}
         try:
-            with open(PRESETS_FILE, "r", encoding="utf-8") as f: return json.load(f)
+            with open(PRESETS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
         except: return {}
 
     def load_selected_preset(self):
@@ -212,7 +223,11 @@ class ResponseTab(QWidget):
             self.exclude_input.setText(data.get("excluded_text", ""))
             self.salary_input.setText(data.get("salary", ""))
             self.region_combo.setCurrentText(data.get("area", "Все регионы"))
+
+            # Резюме
             self.resume_input.setText(data.get("resume_name", ""))
+            self.check_smart_resume.setChecked(data.get("smart_resume", False))
+
             self.letter_edit.setPlainText(data.get("cover_letter", ""))
             self.exp_combo.set_checked_by_data(data.get("experience", []))
             self.employment_combo.set_checked_by_data(data.get("employment_form", []))

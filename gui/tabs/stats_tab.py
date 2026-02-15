@@ -11,7 +11,6 @@ class StatsTab(QWidget):
         self.db = DBManager()
         self.init_ui()
 
-        # Таймер автообновления
         self.timer = QTimer()
         self.timer.timeout.connect(self.refresh_stats)
         self.timer.start(3000)
@@ -20,7 +19,7 @@ class StatsTab(QWidget):
         layout = QVBoxLayout(self)
         layout.setSpacing(20)
 
-        # === Верхняя панель ===
+        # Верхняя панель
         top_layout = QHBoxLayout()
 
         self.total_label = QLabel("Всего: 0")
@@ -29,14 +28,13 @@ class StatsTab(QWidget):
         self.today_label = QLabel("Сегодня: 0")
         self.today_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #a6e3a1;")
 
-        # Профиль (Анимированный список)
+        # Профиль
         self.profile_filter = AnimatedComboBox()
         self.profile_filter.setMinimumHeight(45)
         self.profile_filter.setMinimumWidth(200)
         self.profile_filter.addItem("Все профили")
         self.profile_filter.currentTextChanged.connect(self.refresh_stats)
 
-        # Кнопка Обновить
         refresh_btn = QPushButton("Обновить")
         refresh_btn.setMinimumHeight(45)
         refresh_btn.clicked.connect(self.refresh_stats)
@@ -52,13 +50,16 @@ class StatsTab(QWidget):
 
         layout.addLayout(top_layout)
 
-        # === Таблица ===
+        # === ТАБЛИЦА ===
         self.table = QTableWidget()
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["Вакансия", "Компания", "Профиль", "Время"])
+        # ИЗМЕНЕНИЕ: 5 колонок вместо 4
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(["Вакансия", "Компания", "Профиль", "Резюме", "Время"])
+
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setAlternatingRowColors(True)
 
-        # Стилизация таблицы
         self.table.setStyleSheet("""
             QTableWidget {
                 background-color: #1e1e2e;
@@ -69,27 +70,19 @@ class StatsTab(QWidget):
             }
             QHeaderView::section {
                 background-color: #313244;
-                color: #cba6f7; /* Цвет заголовков */
+                color: #cba6f7;
                 font-weight: bold;
                 padding: 5px;
                 border: 1px solid #1e1e2e;
             }
         """)
 
-        # === НАСТРОЙКА ШИРИНЫ СТОЛБЦОВ ===
-        header = self.table.horizontalHeader()
-
-        # 1. Разрешаем пользователю менять ширину мышкой
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-
-        # 2. Растягиваем последнюю колонку (Время) до конца окна
-        header.setStretchLastSection(True)
-
-        # 3. Задаем начальные размеры (пиксели)
-        self.table.setColumnWidth(0, 300)  # Вакансия (уменьшена)
-        self.table.setColumnWidth(1, 400)  # Компания (увеличена)
-        self.table.setColumnWidth(2, 150)  # Профиль (компактно)
-        # 4-я колонка (Время) займет всё оставшееся место
+        # Ширина столбцов
+        self.table.setColumnWidth(0, 250)  # Вакансия
+        self.table.setColumnWidth(1, 200)  # Компания
+        self.table.setColumnWidth(2, 120)  # Профиль
+        self.table.setColumnWidth(3, 150)  # Резюме (НОВОЕ)
+        # Время растянется
 
         layout.addWidget(self.table)
         self.refresh_stats()
@@ -106,28 +99,24 @@ class StatsTab(QWidget):
         self.table.setRowCount(len(rows))
 
         all_profiles = set()
-        for i, (title, company, timestamp, profile) in enumerate(rows):
+
+        # ИЗМЕНЕНИЕ: Распаковываем 5 значений (resume_used добавился в SQL)
+        # Порядок в SQL: vacancy_title, company_name, timestamp, profile, resume_used
+        for i, (title, company, timestamp, profile, resume) in enumerate(rows):
             if profile: all_profiles.add(profile)
 
-            # Создаем ячейки (только для чтения)
-            item_title = QTableWidgetItem(str(title))
-            item_title.setFlags(item_title.flags() ^ Qt.ItemFlag.ItemIsEditable)
+            # Хелпер для создания ячеек
+            def make_item(text):
+                item = QTableWidgetItem(str(text))
+                item.setFlags(item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+                return item
 
-            item_company = QTableWidgetItem(str(company))
-            item_company.setFlags(item_company.flags() ^ Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(i, 0, make_item(title))
+            self.table.setItem(i, 1, make_item(company))
+            self.table.setItem(i, 2, make_item(profile))
+            self.table.setItem(i, 3, make_item(resume if resume else "-"))  # Колонка Резюме
+            self.table.setItem(i, 4, make_item(str(timestamp).split('.')[0]))
 
-            item_profile = QTableWidgetItem(str(profile))
-            item_profile.setFlags(item_profile.flags() ^ Qt.ItemFlag.ItemIsEditable)
-
-            item_time = QTableWidgetItem(str(timestamp).split('.')[0])
-            item_time.setFlags(item_time.flags() ^ Qt.ItemFlag.ItemIsEditable)
-
-            self.table.setItem(i, 0, item_title)
-            self.table.setItem(i, 1, item_company)
-            self.table.setItem(i, 2, item_profile)
-            self.table.setItem(i, 3, item_time)
-
-        # Обновляем фильтр
         current_items = [self.profile_filter.itemText(i) for i in range(self.profile_filter.count())]
         for p in all_profiles:
             if p not in current_items:

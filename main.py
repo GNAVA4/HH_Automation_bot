@@ -11,7 +11,7 @@ def main():
     os.environ["QT_SCALE_FACTOR"] = "1"
 
     if sys.platform == 'win32':
-        myappid = 'mycompany.hhbot.automation.v1'
+        myappid = 'mycompany.hhbot.automation.v3'
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
     app = QApplication(sys.argv)

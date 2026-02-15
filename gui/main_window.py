@@ -20,7 +20,7 @@ from gui.tabs.updates_tab import UpdatesTab
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("HH Automation Bot v3.1 Beta")
+        self.setWindowTitle("HH Automation Bot v3.5")
 
         screen = QGuiApplication.primaryScreen().availableGeometry()
         width = int(screen.width() * 0.55)
@@ -143,6 +143,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Прервано", f"[{profile}] Браузер закрыт.")
         elif status == "stopped":
             QMessageBox.information(self, "Стоп", f"[{profile}] Процесс остановлен пользователем.")
+        elif status == "auth_error":
+            QMessageBox.warning(self, "Сбой авторизации",
+                                f"[{profile}] Сессия истекла или вход не выполнен.\n"
+                                "Пожалуйста, удалите профиль в Настройках и добавьте его заново.")
         elif "error" in status:
             QMessageBox.critical(self, "Ошибка", f"[{profile}] {status}")
 

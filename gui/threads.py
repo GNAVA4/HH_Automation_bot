@@ -32,6 +32,9 @@ class SearchWorker(QThread):
             elif "ManualClose" in err or "Target closed" in err or "browser has been closed" in err:
                 status = "closed_by_user"
                 logger.warning(f"[{self.profile_name}] Обнаружено ручное закрытие.")
+            elif "AuthError" in err:
+                status = "auth_error"
+                logger.error(f"[{self.profile_name}] Слет авторизации.")
             else:
                 status = f"error: {err}"
                 logger.error(f"[{self.profile_name}] CRITICAL: {err}")

@@ -19,7 +19,7 @@ class DBManager:
         try:
             with sqlite3.connect(self.db_name) as conn:
                 cursor = conn.cursor()
-                # Добавили поле profile
+                # Базовая таблица
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS applications (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,18 +31,24 @@ class DBManager:
                         timestamp DATETIME
                     )
                 """)
+                # Миграция: пытаемся добавить колонку resume_used, если её нет
+                try:
+                    cursor.execute("ALTER TABLE applications ADD COLUMN resume_used TEXT")
+                except:
+                    pass  # Колонка уже есть
+
                 conn.commit()
         except Exception as e:
             logger.error(f"DB Init Error: {e}")
 
-    def add_application(self, title, company, url, profile, status="success"):
+    def add_application(self, title, company, url, profile, resume_used="Не указано", status="success"):
         try:
             with sqlite3.connect(self.db_name) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    INSERT INTO applications (vacancy_title, company_name, url, status, profile, timestamp)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (title, company, url, status, profile, datetime.now()))
+                    INSERT INTO applications (vacancy_title, company_name, url, status, profile, resume_used, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (title, company, url, status, profile, resume_used, datetime.now()))
                 conn.commit()
         except Exception as e:
             logger.error(f"DB Add Error: {e}")
@@ -51,13 +57,16 @@ class DBManager:
         try:
             with sqlite3.connect(self.db_name) as conn:
                 cursor = conn.cursor()
+                # Выбираем resume_used тоже
+                query = "SELECT vacancy_title, company_name, timestamp, profile, resume_used FROM applications"
+
                 if profile_filter:
-                    cursor.execute(
-                        "SELECT vacancy_title, company_name, timestamp, profile FROM applications WHERE profile=? ORDER BY id DESC",
-                        (profile_filter,))
+                    query += " WHERE profile=? ORDER BY id DESC"
+                    cursor.execute(query, (profile_filter,))
                 else:
-                    cursor.execute(
-                        "SELECT vacancy_title, company_name, timestamp, profile FROM applications ORDER BY id DESC")
+                    query += " ORDER BY id DESC"
+                    cursor.execute(query)
+
                 return cursor.fetchall()
         except Exception as e:
             return []
