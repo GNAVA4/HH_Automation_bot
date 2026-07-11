@@ -11,6 +11,7 @@ from gui.tabs.stats_tab import StatsTab
 from gui.tabs.settings_tab import SettingsTab
 from gui.tabs.diagnostics_tab import DiagnosticsTab
 from gui.tabs.about_tab import AboutTab
+from gui.tabs.tests_tab import TestsTab
 
 from core.logger import setup_logger
 from gui.threads import SearchWorker, ActivityWorker
@@ -40,7 +41,7 @@ class MainWindow(QMainWindow):
         self.sidebar.setFrameShape(QListWidget.Shape.NoFrame)
         self.sidebar.currentRowChanged.connect(self.change_page)
 
-        menu_items = ["Отклики", "Активность", "Статистика", "Настройки", "Диагностика", "Обновления", "О приложении"]
+        menu_items = ["Отклики", "Активность", "Тесты", "Статистика", "Настройки", "Диагностика", "Обновления", "О приложении"]
         for item in menu_items: self.sidebar.addItem(item)
 
         right_widget = QWidget()
@@ -51,6 +52,7 @@ class MainWindow(QMainWindow):
         self.pages = QStackedWidget()
         self.response_tab = ResponseTab()
         self.activity_tab = ActivityTab()
+        self.tests_tab = TestsTab()
         self.stats_tab = StatsTab()
         self.settings_tab = SettingsTab()
         self.diagnostics_tab = DiagnosticsTab()
@@ -59,6 +61,7 @@ class MainWindow(QMainWindow):
 
         self.pages.addWidget(self.response_tab)
         self.pages.addWidget(self.activity_tab)
+        self.pages.addWidget(self.tests_tab)
         self.pages.addWidget(self.stats_tab)
         self.pages.addWidget(self.settings_tab)
         self.pages.addWidget(self.diagnostics_tab)
@@ -96,7 +99,7 @@ class MainWindow(QMainWindow):
             self.response_tab.refresh_profiles()
         elif index == 1:
             self.activity_tab.refresh_profiles()
-        elif index == 3:
+        elif index == 4:
             self.settings_tab.refresh_profiles()
 
     def load_styles(self):

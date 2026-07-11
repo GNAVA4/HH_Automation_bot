@@ -33,7 +33,10 @@ DEFAULT_SETTINGS = {
     "scroll_delay_min": 0.005,  # Почти без пауз
     "scroll_delay_max": 0.05,
 
-    "smart_resume": True
+    "smart_resume": True,
+
+    # Проходить тесты работодателя после отклика (см. core/test_solver.py)
+    "solve_tests": True
 }
 
 

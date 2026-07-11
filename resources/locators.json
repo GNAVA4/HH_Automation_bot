@@ -34,5 +34,16 @@
     "login_btn": "[data-qa='login']",
     "vacancy_response_icon": "[data-qa='vacancy-serp__vacancy_response']",
     "my_resumes": "[data-qa='mainmenu_myResumes']"
+  },
+  "test_page": {
+    "test_marker": "[data-qa='employer-asking-for-test']",
+    "task_body": "[data-qa='task-body']",
+    "task_question": "[data-qa='task-question']",
+    "option_cell": "label[data-qa='cell']",
+    "letter_toggle": "[data-qa='vacancy-response-letter-toggle']",
+    "letter_input": "[data-qa='vacancy-response-popup-form-letter-input']",
+    "submit_btn": "[data-qa='vacancy-response-submit-popup']",
+    "resume_title": "[data-qa='resume-title']",
+    "already_responded": "[data-qa='already-responded-text']"
   }
 }

@@ -11,6 +11,7 @@ from difflib import SequenceMatcher  # Нужен для умного поиск
 from database.db_manager import DBManager
 from core.settings_manager import SettingsManager
 from core.humanizer import HumanLike
+from core.test_solver import TestSolver
 from core.utils import get_user_data_path, get_resource_path
 
 logger = logging.getLogger("HH_Automation_bot")
@@ -24,6 +25,8 @@ class BrowserEngine:
         self.page = None
         self.human = None
         self.should_run = True
+        self.test_solver = None
+        self.last_search_url = None
 
         self.settings_mgr = SettingsManager()
         self.profile_name = profile_name if profile_name else self.settings_mgr.get("current_profile")
@@ -181,6 +184,7 @@ class BrowserEngine:
             for val in data.get(key, []): query_params.append((key, val))
 
         full_url = f"{base_url}?{urlencode(query_params)}"
+        self.last_search_url = full_url
         self.log(f"Поиск: {full_url}")
 
         try:
@@ -288,11 +292,31 @@ class BrowserEngine:
                             self._try_handle_overlays()
                         consecutive_errors = 0
                     else:
-                        self.log("Тест/Редирект. Пропуск.", "warning")
-                        if "hh.ru/search" not in self.page.url:
-                            self.page.go_back()
-                            self.page.wait_for_load_state("domcontentloaded")
-                            self.smart_sleep(1)
+                        # Не модалка -> тест работодателя или редирект
+                        solve = self.settings_mgr.get("solve_tests") is not False
+                        if solve and ("vacancy_response" in self.page.url or "hh.ru/search" not in self.page.url):
+                            info = {"title": title, "company": company}
+                            used_resume = self.handle_test_page(data, info)
+                            if used_resume:
+                                self.db.add_application(title, company, url, self.profile_name, used_resume)
+                                count_processed += 1
+                                self.log(f"[{count_processed}/{limit}] Тест пройден: {title}")
+                            else:
+                                self.log("Тест не пройден/пропущен.", "warning")
+                        else:
+                            self.log("Тест/Редирект. Пропуск.", "warning")
+
+                        # Возврат к выдаче: карточки устарели -> переобход страницы
+                        if self.last_search_url and "hh.ru/search" not in self.page.url:
+                            try:
+                                self.page.goto(self.last_search_url)
+                                self.page.wait_for_load_state("domcontentloaded")
+                                self.smart_sleep(2)
+                            except Exception:
+                                pass
+                        consecutive_errors = 0
+                        restart_page = True
+                        break
 
                     self.smart_sleep(random.uniform(1.0, 2.5))  # Быстрее, чем было
 
@@ -452,6 +476,105 @@ class BrowserEngine:
             if "Target closed" in str(e) or "browser has been closed" in str(e): raise
             return False
         return False
+
+    def handle_test_page(self, data, info, submit=True):
+        """Обрабатывает страницу теста работодателя: отвечает на все вопросы,
+        ВСЕГДА прикладывает сопроводительное письмо и отправляет отклик.
+        Возвращает имя резюме при успехе, иначе False. submit=False — dry-run (без отправки)."""
+        try:
+            page = self.page
+            loc = self.locators.get("test_page", {})
+            if self.test_solver is None:
+                self.test_solver = TestSolver(engine=self)
+            solver = self.test_solver
+
+            if not solver.has_test(page):
+                return False  # не тест (внешний редирект/иная страница)
+
+            self.log("Тест работодателя — отвечаю на вопросы...")
+            results = solver.fill(page)
+            for r in results:
+                mark = "ok" if r["filled"] else f"FAIL({r['reason']})"
+                self.log(f"  [{mark}] {r['question'][:45]} -> {str(r['answer'])[:25]}")
+            unanswered = [r for r in results if not r["filled"]]
+
+            # Резюме — берём преселект (умный выбор на тесте пока не делаем)
+            used_resume = "Default"
+            try:
+                rt = page.locator(loc.get("resume_title", "[data-qa='resume-title']")).first
+                if rt.count() > 0 and rt.is_visible():
+                    used_resume = (rt.text_content() or "Default").strip()
+            except Exception:
+                pass
+
+            # Сопроводительное письмо — ОБЯЗАТЕЛЬНО
+            letter = data.get("cover_letter", "") or ""
+            if letter:
+                letter = (letter.replace("{company}", info.get("company", ""))
+                                .replace("{vacancy}", info.get("title", ""))
+                                .replace("{name}", self.profile_name))
+            if not letter:
+                letter = (solver.kb.get("fallbacks", {}).get("open_text")
+                          or "Здравствуйте! Заинтересован в вашей вакансии, готов обсудить детали.")
+            try:
+                toggle = page.locator(loc.get("letter_toggle", "[data-qa='vacancy-response-letter-toggle']")).first
+                if toggle.count() > 0 and toggle.is_visible():
+                    toggle.click(force=True)
+                    self.smart_sleep(0.5)
+                area = page.locator(loc.get("letter_input", "[data-qa='vacancy-response-popup-form-letter-input']")).first
+                if area.count() > 0 and area.is_visible():
+                    area.fill(letter)
+                else:
+                    self.log("Поле письма не найдено", "warning")
+            except Exception as e:
+                self.log(f"Не удалось приложить письмо: {e}", "warning")
+
+            if unanswered:
+                self.log(f"⚠️ {len(unanswered)} вопрос(ов) без ответа — отклик может не пройти.", "warning")
+
+            if not submit:
+                self.log("Dry-run: отклик НЕ отправлен.", "warning")
+                return False
+
+            # Отправка
+            btn = page.locator(loc.get("submit_btn", "[data-qa='vacancy-response-submit-popup']")).first
+            if btn.count() == 0 or not btn.is_visible():
+                self.log("Кнопка отправки теста не найдена", "warning")
+                return False
+            btn.click()
+            # Подтверждение успеха: появляется индикатор "Вы откликнулись".
+            # (кнопка сабмита и маркер теста на этой странице остаются — на них полагаться нельзя)
+            success = False
+            try:
+                page.wait_for_selector(loc.get("already_responded", "[data-qa='already-responded-text']"),
+                                       timeout=8000)
+                success = True
+            except Exception:
+                try:
+                    if "откликнулись" in (page.locator("body").inner_text() or "").lower():
+                        success = True
+                except Exception:
+                    pass
+            # Закрываем возможный онбординг-диалог HH после отправки
+            try:
+                dlg = page.locator("div[role='dialog']").first
+                if dlg.count() > 0 and dlg.is_visible():
+                    page.keyboard.press("Escape")
+                    self.smart_sleep(0.3)
+            except Exception:
+                pass
+            self.smart_sleep(1)
+            if success:
+                self.log("Отклик на тест отправлен ✓")
+            return used_resume if success else False
+
+        except Exception as e:
+            if isinstance(e, InterruptedError):
+                raise
+            if "Target closed" in str(e) or "browser has been closed" in str(e):
+                raise
+            self.log(f"Ошибка обработки теста: {e}", "error")
+            return False
 
     def run_resume_update(self):
         self.log("=== ПОДНЯТИЕ РЕЗЮМЕ ===")
