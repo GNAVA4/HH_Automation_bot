@@ -494,21 +494,39 @@ class BrowserEngine:
                         except:
                             pass
 
-            # Письмо
-            text = data.get("cover_letter", "")
-            if text:
-                final_text = text.replace("{company}", info['company']).replace("{vacancy}", info['title']).replace(
-                    "{name}", self.profile_name)
-                area = modal.locator(modal_locators.get("letter_input", "textarea")).first
-                btn = modal.locator(modal_locators.get("add_letter_btn", "[data-qa='add-cover-letter']")).first
-                if not area.is_visible() and btn.is_visible(): btn.click(); self.smart_sleep(0.3)
-                if area.is_visible():
-                    if self.human and self.settings_mgr.get("use_human_moves"):
-                        self.human.human_type(area, final_text)
-                    else:
-                        area.fill(final_text)
+            # Свернём список резюме перед письмом, чтобы не путать поля
+            self._collapse_resume_list()
 
-            # Свернём список резюме заранее (частая причина перекрытия кнопки)
+            # Сопроводительное письмо — пишем ВСЕГДА: часто обязательно, иначе кнопка
+            # отправки остаётся disabled. Селекторы обновлены (letter-toggle / letter-input).
+            letter = data.get("cover_letter", "") or ""
+            if letter:
+                letter = (letter.replace("{company}", info.get('company', ''))
+                                .replace("{vacancy}", info.get('title', ''))
+                                .replace("{name}", self.profile_name))
+            if not letter:
+                letter = "Здравствуйте! Заинтересован в вашей вакансии, готов обсудить детали."
+            try:
+                letter_sel = modal_locators.get("letter_input", "[data-qa='vacancy-response-popup-form-letter-input']")
+                area = modal.locator(letter_sel).first
+                if area.count() == 0 or not area.is_visible():
+                    toggle = modal.locator(modal_locators.get("add_letter_btn", "[data-qa='vacancy-response-letter-toggle']")).first
+                    if toggle.count() > 0 and toggle.is_visible():
+                        toggle.click(force=True)
+                        self.smart_sleep(0.4)
+                        area = modal.locator(letter_sel).first
+                if area.count() == 0 or not area.is_visible():
+                    area = modal.locator("textarea").last  # старый фолбэк
+                if area.count() > 0 and area.is_visible():
+                    if self.human and self.settings_mgr.get("use_human_moves"):
+                        self.human.human_type(area, letter)
+                    else:
+                        area.fill(letter)
+                    self.smart_sleep(0.3)
+            except Exception as e:
+                self.log(f"Письмо не удалось вписать: {e}", "warning")
+
+            # Свернём список резюме ещё раз (на случай повторного открытия)
             self._collapse_resume_list()
 
             submit = modal.locator(modal_locators.get("submit_btn", "[data-qa='vacancy-response-submit-popup']")).first

@@ -9,8 +9,8 @@
   },
   "response_modal": {
     "dialog": "div[role='dialog']",
-    "add_letter_btn": "[data-qa='add-cover-letter']",
-    "letter_input": "textarea",
+    "add_letter_btn": "[data-qa='vacancy-response-letter-toggle']",
+    "letter_input": "[data-qa='vacancy-response-popup-form-letter-input']",
     "submit_btn": "[data-qa='vacancy-response-submit-popup']",
     "submit_btn_alt": "button[type='submit']",
     "resume_trigger": "[data-qa='resume-title']",
