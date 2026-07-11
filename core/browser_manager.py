@@ -367,6 +367,47 @@ class BrowserEngine:
                     if "Target closed" in str(e) or "browser has been closed" in str(e): raise e
                     break
 
+    def _collapse_resume_list(self):
+        """Сворачивает открытый список выбора резюме кликом по заголовку, чтобы он
+        не перекрывал кнопку отправки. (Escape не используем — он может закрыть модалку.)"""
+        try:
+            opts = self.page.locator("[data-magritte-select-option]")
+            if opts.count() > 0 and opts.first.is_visible():
+                trg = self.page.locator("[data-qa='resume-title']").first
+                if trg.count() > 0 and trg.is_visible():
+                    trg.click(force=True)
+                    self.smart_sleep(0.3)
+        except Exception:
+            pass
+
+    def _dismiss_cookie(self):
+        """Закрывает нижнюю cookie-плашку, которая тоже может перекрывать кнопку."""
+        for sel in ["[data-qa='cookie-policy-informer-accept']", "button:has-text('Понятно')"]:
+            try:
+                l = self.page.locator(sel).first
+                if l.count() > 0 and l.is_visible():
+                    l.click(force=True)
+                    self.smart_sleep(0.2)
+            except Exception:
+                pass
+
+    def _click_submit(self, submit):
+        """Клик по кнопке отправки: сначала свернуть список резюме и убрать оверлеи,
+        затем клик с коротким таймаутом и force-фолбэком (без 30-сек зависания)."""
+        self._collapse_resume_list()
+        self._dismiss_cookie()
+        try:
+            submit.click(timeout=4000)
+            return True
+        except Exception:
+            # перекрыто — ещё раз свернём список и форсируем
+            self._collapse_resume_list()
+            try:
+                submit.click(force=True, timeout=4000)
+                return True
+            except Exception:
+                return False
+
     def handle_response_modal(self, data, info):
         try:
             modal_locators = self.locators.get("response_modal", {})
@@ -467,10 +508,14 @@ class BrowserEngine:
                     else:
                         area.fill(final_text)
 
+            # Свернём список резюме заранее (частая причина перекрытия кнопки)
+            self._collapse_resume_list()
+
             submit = modal.locator(modal_locators.get("submit_btn", "[data-qa='vacancy-response-submit-popup']")).first
             if not submit.is_visible(): submit = modal.locator(modal_locators.get("submit_btn_alt", "button[type='submit']")).first
             if submit.is_visible():
-                submit.click()
+                if not self._click_submit(submit):
+                    return False
                 try:
                     modal.wait_for(state="hidden", timeout=5000)
                     return used_resume_name
@@ -608,7 +653,9 @@ class BrowserEngine:
             if btn.count() == 0 or not btn.is_visible():
                 self.log("Кнопка отправки теста не найдена", "warning")
                 return False
-            btn.click()
+            if not self._click_submit(btn):
+                self.log("Не удалось нажать кнопку отправки (перекрыта).", "warning")
+                return False
             # Подтверждение успеха: появляется индикатор "Вы откликнулись".
             # (кнопка сабмита и маркер теста на этой странице остаются — на них полагаться нельзя)
             success = False
