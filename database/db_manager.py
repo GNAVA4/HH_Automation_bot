@@ -17,8 +17,10 @@ class DBManager:
 
     def init_db(self):
         try:
-            with sqlite3.connect(self.db_name) as conn:
+            with sqlite3.connect(self.db_name, timeout=10) as conn:
                 cursor = conn.cursor()
+                # WAL: параллельные читатели не блокируют писателя (важно при мультиаккаунте)
+                cursor.execute("PRAGMA journal_mode=WAL")
                 # Базовая таблица
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS applications (
@@ -43,7 +45,7 @@ class DBManager:
 
     def add_application(self, title, company, url, profile, resume_used="Не указано", status="success"):
         try:
-            with sqlite3.connect(self.db_name) as conn:
+            with sqlite3.connect(self.db_name, timeout=10) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     INSERT INTO applications (vacancy_title, company_name, url, status, profile, resume_used, timestamp)
@@ -53,9 +55,22 @@ class DBManager:
         except Exception as e:
             logger.error(f"DB Add Error: {e}")
 
+    def has_applied(self, vacancy_id, profile):
+        """True, если для этого профиля уже есть отклик на вакансию с таким id."""
+        try:
+            with sqlite3.connect(self.db_name, timeout=10) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT 1 FROM applications WHERE profile=? AND url LIKE ? LIMIT 1",
+                    (profile, f"%/vacancy/{vacancy_id}%"),
+                )
+                return cursor.fetchone() is not None
+        except Exception:
+            return False
+
     def get_all_applications(self, profile_filter=None):
         try:
-            with sqlite3.connect(self.db_name) as conn:
+            with sqlite3.connect(self.db_name, timeout=10) as conn:
                 cursor = conn.cursor()
                 # Выбираем resume_used тоже
                 query = "SELECT vacancy_title, company_name, timestamp, profile, resume_used FROM applications"
@@ -73,7 +88,7 @@ class DBManager:
 
     def get_stats(self, profile_filter=None):
         try:
-            with sqlite3.connect(self.db_name) as conn:
+            with sqlite3.connect(self.db_name, timeout=10) as conn:
                 cursor = conn.cursor()
 
                 query_total = "SELECT COUNT(*) FROM applications WHERE status='success'"

@@ -3,6 +3,7 @@ from core.browser_manager import BrowserEngine
 import logging
 import os
 import time
+import json
 
 logger = logging.getLogger("HH_Automation_bot")
 
@@ -100,6 +101,13 @@ class LoginWorker(QThread):
     def __init__(self, save_path):
         super().__init__()
         self.save_path = save_path
+        # Загружаем локаторы один раз при создании воркера
+        try:
+            from core.utils import get_resource_path
+            with open(get_resource_path("resources/locators.json"), "r") as f:
+                self.locators = json.load(f)
+        except:
+            self.locators = {}
 
     def run(self):
         from playwright.sync_api import sync_playwright
@@ -115,6 +123,11 @@ class LoginWorker(QThread):
 
             success = False
             msg = "Время вышло (120 сек)."
+
+            # Получаем селекторы из конфига с фоллбэками
+            auth_locators = self.locators.get("auth", {})
+            vacancy_response_selector = auth_locators.get("vacancy_response_icon", "[data-qa='vacancy-serp__vacancy_response']")
+            my_resumes_selector = auth_locators.get("my_resumes", "[data-qa='mainmenu_myResumes']")
 
             try:
                 # 1. Переход (не ждем полной загрузки вечно)
@@ -135,14 +148,14 @@ class LoginWorker(QThread):
                     # Проверяем наличие иконки профиля (значит вошли)
                     # Используем count(), чтобы не падало с ошибкой, если нет
                     try:
-                        if page.locator("[data-qa='vacancy-serp__vacancy_response']").count() > 0:
+                        if page.locator(vacancy_response_selector).count() > 0:
                             success = True
                             msg = f"Профиль успешно сохранен: {os.path.basename(self.save_path)}"
                             logger.info(f"Профиль успешно сохранен: {os.path.basename(self.save_path)}")
                             break
 
                         # Альтернативная проверка: Кнопка "Создать резюме" или "Мои резюме"
-                        if page.locator("[data-qa='mainmenu_myResumes']").count() > 0:
+                        if page.locator(my_resumes_selector).count() > 0:
                             success = True
                             msg = f"Профиль успешно сохранен!"
                             logger.info(f"Профиль успешно сохранен: {os.path.basename(self.save_path)}")
