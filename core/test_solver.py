@@ -13,6 +13,7 @@
 import json
 import os
 import re
+import random
 import logging
 
 from core.utils import get_user_data_path
@@ -24,7 +25,15 @@ ANSWERS_FILE = "test_answers.json"
 DEFAULT_KB = {
     # Список правил пользователя: подстрока вопроса -> готовый ответ
     # Для radio ответ = текст варианта ("Да"), для textarea = сам текст.
-    "qa": [],
+    # Эти заготовки можно править во вкладке "Тесты".
+    "qa": [
+        {"match": "рутинных задач",
+         "answer": "Отношусь к ним спокойно и с пониманием, готов уделять им значимую часть времени."},
+        {"match": "глубоким анализом данных",
+         "answer": "Мне это очень интересно: предпочитаю детально разбираться в данных и избегать поверхностных выводов."},
+        {"match": "горящая клиентская задача",
+         "answer": "Сделаю сегодня, чтобы клиент получил результат как можно скорее."}
+    ],
     "fallbacks": {
         "salary_text": "по договоренности",
         "open_text": "Благодарю за интерес к моей кандидатуре. Готов подробно рассказать "
@@ -32,12 +41,16 @@ DEFAULT_KB = {
         "yesno_prefer": "Да",
         "rating_text": "Высокий уровень",   # ответ на текстовый вопрос «как оцениваете уровень…»
         "rating_scale_max": "5",             # ответ, если в вопросе явная шкала (1..5)
+        "city_text": "Москва",               # ответ на вопрос про город
         "skill_level": "last"   # last | first | middle — какой вариант шкалы владения выбирать
     }
 }
 
 # Ключевые слова для классификации свободных вопросов
 SALARY_KEYWORDS = ["зарплат", "заработн", "доход", "оклад", "ндфл", "вилк", "ожидания по уровню", "уровень дохода"]
+# Вопрос про город
+CITY_KEYWORDS = ["укажите город", "город, откуда", "из какого города", "в каком городе",
+                 "город проживания", "откуда планируете работать", "ваш город"]
 # Свободный вопрос, который по смыслу «да/нет» -> отвечаем утвердительно
 YESNO_TEXT_KEYWORDS = ["есть ли", "имеется ли", "имеете ли", "владеете ли", "готовы ли", "готов ли",
                        "можете ли", "согласны ли", "рассматриваете ли", "устраивает ли", "подходит ли",
@@ -166,6 +179,8 @@ class TestSolver:
         if q["type"] == "textarea":
             if any(k in qn for k in SALARY_KEYWORDS):
                 return self.kb["fallbacks"].get("salary_text") or "по договоренности"
+            if any(k in qn for k in CITY_KEYWORDS):
+                return self.kb["fallbacks"].get("city_text") or "Москва"
             if any(k in qn for k in YESNO_TEXT_KEYWORDS):
                 return self.kb["fallbacks"].get("yesno_prefer") or "Да"
             if any(k in qn for k in RATING_TEXT_KEYWORDS):
@@ -239,13 +254,14 @@ class TestSolver:
             filled = False
             reason = ""
             body = bodies.nth(q["index"])
+            self._answer_pause()  # небольшая пауза, чтобы отвечать не мгновенно
             try:
                 if q["type"] == "textarea":
                     # текстовое поле НИКОГДА не оставляем пустым
                     if not ans:
                         ans = self.kb["fallbacks"].get("open_text") or "Готов обсудить детали на собеседовании."
                     area = body.locator("textarea").first
-                    area.fill(ans)
+                    self._fill_textarea(area, ans)
                     filled = True
                 elif q["type"] in ("radio", "checkbox"):
                     target = _norm(ans)
@@ -279,6 +295,27 @@ class TestSolver:
             results.append({"index": q["index"], "question": q["question"],
                             "type": q["type"], "answer": ans, "filled": filled, "reason": reason})
         return results
+
+    def _answer_pause(self):
+        """Пауза между ответами, чтобы отвечать не мгновенно.
+        Длительность настраивается: settings.test_answer_delay (сек). 0 = мгновенно."""
+        if not self.engine:
+            return
+        try:
+            base = float(self.engine.settings_mgr.get("test_answer_delay"))
+        except Exception:
+            base = 0.8
+        if base <= 0:
+            return
+        try:
+            self.engine.smart_sleep(random.uniform(base * 0.6, base * 1.2))
+        except Exception:
+            pass
+
+    def _fill_textarea(self, area, text):
+        """Мгновенный ввод текста (посимвольный слишком долгий для длинных ответов);
+        реализм задаётся паузой между ответами (_answer_pause)."""
+        area.fill(text)
 
     def _fallback_index(self, texts):
         """Безопасный вариант, если ответ не распознан: последний не-кастомный и

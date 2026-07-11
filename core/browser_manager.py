@@ -27,6 +27,7 @@ class BrowserEngine:
         self.should_run = True
         self.test_solver = None
         self.last_search_url = None
+        self.current_page = 0
 
         self.settings_mgr = SettingsManager()
         self.profile_name = profile_name if profile_name else self.settings_mgr.get("current_profile")
@@ -185,6 +186,7 @@ class BrowserEngine:
 
         full_url = f"{base_url}?{urlencode(query_params)}"
         self.last_search_url = full_url
+        self.current_page = 0
         self.log(f"Поиск: {full_url}")
 
         try:
@@ -306,10 +308,13 @@ class BrowserEngine:
                         else:
                             self.log("Тест/Редирект. Пропуск.", "warning")
 
-                        # Возврат к выдаче: карточки устарели -> переобход страницы
+                        # Возврат к выдаче на ТУ ЖЕ страницу (карточки устарели -> переобход)
                         if self.last_search_url and "hh.ru/search" not in self.page.url:
                             try:
-                                self.page.goto(self.last_search_url)
+                                back_url = self.last_search_url
+                                if self.current_page > 0:
+                                    back_url += f"&page={self.current_page}"
+                                self.page.goto(back_url)
                                 self.page.wait_for_load_state("domcontentloaded")
                                 self.smart_sleep(2)
                             except Exception:
@@ -352,6 +357,7 @@ class BrowserEngine:
                         next_btn.click()
                         self.page.wait_for_load_state("domcontentloaded")
                         self.smart_sleep(2)
+                        self.current_page += 1
                         consecutive_errors = 0
                     else:
                         self.log("Конец списка.")
@@ -477,6 +483,73 @@ class BrowserEngine:
             return False
         return False
 
+    def _select_resume_test_page(self, page, loc, data, info):
+        """Умный выбор резюме на странице теста (аналог логики модалки).
+        Возвращает имя выбранного/текущего резюме."""
+        trigger_sel = loc.get("resume_title", "[data-qa='resume-title']")
+        used = "Default"
+        try:
+            trigger = page.locator(trigger_sel).first
+            if trigger.count() == 0 or not trigger.is_visible():
+                return used
+            current = (trigger.text_content() or "").strip()
+            used = current or used
+
+            target_resume = (data.get("resume_name") or "").strip()
+            use_smart = data.get("smart_resume", False)
+            if not use_smart and not target_resume:
+                return used  # оставляем преселект
+
+            vacancy_title = (info.get("title") or "").lower()
+            trigger.click(force=True)
+            self.smart_sleep(0.6)
+            options = page.locator("[data-magritte-select-option]").all()
+            if not options:
+                return used  # список не раскрылся — не трогаем
+            texts = [(o.text_content() or "").strip() for o in options]
+
+            target_text = None
+            if use_smart and vacancy_title:
+                best_ratio, best = 0, None
+                for t in texts:
+                    r = SequenceMatcher(None, vacancy_title, t.lower()).ratio()
+                    if r > best_ratio:
+                        best_ratio, best = r, t
+                if best_ratio > 0.3:
+                    target_text = best
+                    self.log(f"Умный подбор резюме: '{vacancy_title}' -> '{best}'")
+            if target_text is None and target_resume:
+                for t in texts:
+                    if target_resume.lower() in t.lower():
+                        target_text = t
+                        break
+            # Если подбор совпал с текущим (или не найден) — не перекликиваем, просто закрываем список
+            if not target_text or target_text.strip().lower() == (current or "").strip().lower():
+                try:
+                    page.keyboard.press("Escape")
+                except Exception:
+                    pass
+                return current or used
+
+            for o, t in zip(options, texts):
+                if target_text.lower() in t.lower():
+                    try:
+                        o.scroll_into_view_if_needed()
+                        o.click(force=True)
+                        used = t
+                        self.smart_sleep(0.4)
+                    except Exception:
+                        pass
+                    break
+            # гарантированно закрываем список, чтобы он не перекрывал кнопку отправки
+            try:
+                page.keyboard.press("Escape")
+            except Exception:
+                pass
+            return used
+        except Exception:
+            return used
+
     def handle_test_page(self, data, info, submit=True):
         """Обрабатывает страницу теста работодателя: отвечает на все вопросы,
         ВСЕГДА прикладывает сопроводительное письмо и отправляет отклик.
@@ -498,14 +571,8 @@ class BrowserEngine:
                 self.log(f"  [{mark}] {r['question'][:45]} -> {str(r['answer'])[:25]}")
             unanswered = [r for r in results if not r["filled"]]
 
-            # Резюме — берём преселект (умный выбор на тесте пока не делаем)
-            used_resume = "Default"
-            try:
-                rt = page.locator(loc.get("resume_title", "[data-qa='resume-title']")).first
-                if rt.count() > 0 and rt.is_visible():
-                    used_resume = (rt.text_content() or "Default").strip()
-            except Exception:
-                pass
+            # Резюме — умный выбор / заданное имя (иначе преселект)
+            used_resume = self._select_resume_test_page(page, loc, data, info)
 
             # Сопроводительное письмо — ОБЯЗАТЕЛЬНО
             letter = data.get("cover_letter", "") or ""

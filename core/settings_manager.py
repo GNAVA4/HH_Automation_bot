@@ -36,7 +36,9 @@ DEFAULT_SETTINGS = {
     "smart_resume": True,
 
     # Проходить тесты работодателя после отклика (см. core/test_solver.py)
-    "solve_tests": True
+    "solve_tests": True,
+    # Пауза между ответами в тесте (сек), чтобы отвечать не мгновенно. 0 = мгновенно
+    "test_answer_delay": 0.5
 }
 
 

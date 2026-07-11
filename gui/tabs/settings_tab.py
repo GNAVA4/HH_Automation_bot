@@ -71,6 +71,19 @@ class SettingsTab(QWidget):
         self.check_multi.stateChanged.connect(lambda v: self.settings_mgr.set("enable_multi_account", bool(v)))
         form_layout.addRow(self.check_multi)
 
+        self.check_solve_tests = QCheckBox("Проходить тесты работодателя (авто-ответы, база во вкладке «Тесты»)")
+        self.check_solve_tests.setChecked(self.settings_mgr.get("solve_tests") is not False)
+        self.check_solve_tests.stateChanged.connect(lambda v: self.settings_mgr.set("solve_tests", bool(v)))
+        form_layout.addRow(self.check_solve_tests)
+
+        self.test_delay = QDoubleSpinBox()
+        self.test_delay.setRange(0, 10)
+        self.test_delay.setDecimals(1)
+        self.test_delay.setSingleStep(0.1)
+        self.test_delay.setValue(float(self.settings_mgr.get("test_answer_delay")))
+        self.test_delay.valueChanged.connect(lambda v: self.settings_mgr.set("test_answer_delay", float(v)))
+        form_layout.addRow("Пауза между ответами в тесте (сек):", self.test_delay)
+
         limits_group.setLayout(form_layout)
         layout.addWidget(limits_group)
 
