@@ -510,13 +510,20 @@ class BrowserEngine:
                 letter_sel = modal_locators.get("letter_input", "[data-qa='vacancy-response-popup-form-letter-input']")
                 area = modal.locator(letter_sel).first
                 if area.count() == 0 or not area.is_visible():
-                    toggle = modal.locator(modal_locators.get("add_letter_btn", "[data-qa='vacancy-response-letter-toggle']")).first
-                    if toggle.count() > 0 and toggle.is_visible():
-                        toggle.click(force=True)
-                        self.smart_sleep(0.4)
-                        area = modal.locator(letter_sel).first
+                    # Письмо необязательное — раскрываем по кнопке.
+                    # Варианты вёрстки HH: 'add-cover-letter' (модалка) / 'vacancy-response-letter-toggle' (тест).
+                    toggles = [modal_locators.get("add_letter_btn", "[data-qa='add-cover-letter']"),
+                               "[data-qa='add-cover-letter']",
+                               "[data-qa='vacancy-response-letter-toggle']"]
+                    for tsel in toggles:
+                        tb = modal.locator(tsel).first
+                        if tb.count() > 0 and tb.is_visible():
+                            tb.click(force=True)
+                            self.smart_sleep(0.4)
+                            break
+                    area = modal.locator(letter_sel).first
                 if area.count() == 0 or not area.is_visible():
-                    area = modal.locator("textarea").last  # старый фолбэк
+                    area = modal.locator("textarea").last  # общий фолбэк
                 if area.count() > 0 and area.is_visible():
                     if self.human and self.settings_mgr.get("use_human_moves"):
                         self.human.human_type(area, letter)
