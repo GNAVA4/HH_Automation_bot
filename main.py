@@ -2,9 +2,45 @@ import sys
 import os
 import ctypes
 from PyQt6.QtWidgets import QApplication, QStyleFactory
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QPalette, QColor
 from gui.main_window import MainWindow
 from core.utils import get_resource_path
+
+
+def apply_dark_palette(app):
+    """Принудительно тёмная палитра — чтобы внешний вид НЕ зависел от темы Windows.
+    Покрывает виджеты, которые не полностью стилизованы через QSS."""
+    base = QColor("#1e1e2e")
+    deep = QColor("#181825")
+    surface = QColor("#313244")
+    text = QColor("#cdd6f4")
+    subtle = QColor("#a6adc8")
+    disabled = QColor("#6c7086")
+    accent = QColor("#89b4fa")
+
+    p = QPalette()
+    p.setColor(QPalette.ColorRole.Window, base)
+    p.setColor(QPalette.ColorRole.WindowText, text)
+    p.setColor(QPalette.ColorRole.Base, deep)
+    p.setColor(QPalette.ColorRole.AlternateBase, surface)
+    p.setColor(QPalette.ColorRole.ToolTipBase, QColor("#11111b"))
+    p.setColor(QPalette.ColorRole.ToolTipText, text)
+    p.setColor(QPalette.ColorRole.Text, text)
+    p.setColor(QPalette.ColorRole.Button, surface)
+    p.setColor(QPalette.ColorRole.ButtonText, text)
+    p.setColor(QPalette.ColorRole.BrightText, QColor("#f38ba8"))
+    p.setColor(QPalette.ColorRole.Link, accent)
+    p.setColor(QPalette.ColorRole.Highlight, accent)
+    p.setColor(QPalette.ColorRole.HighlightedText, QColor("#11111b"))
+    p.setColor(QPalette.ColorRole.PlaceholderText, subtle)
+
+    for role in (QPalette.ColorRole.WindowText, QPalette.ColorRole.Text,
+                 QPalette.ColorRole.ButtonText):
+        p.setColor(QPalette.ColorGroup.Disabled, role, disabled)
+    p.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Base, base)
+    p.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Button, base)
+
+    app.setPalette(p)
 
 def main():
     os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
@@ -23,6 +59,7 @@ def main():
         app.setWindowIcon(app_icon)
 
     app.setStyle(QStyleFactory.create("Fusion"))
+    apply_dark_palette(app)
 
     window = MainWindow()
 
