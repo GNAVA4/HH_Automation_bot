@@ -1,9 +1,13 @@
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                             QListWidget, QStackedWidget, QTextEdit, QMessageBox)
-from PyQt6.QtCore import pyqtSlot
-from PyQt6.QtGui import QGuiApplication
+                             QListWidget, QListWidgetItem, QStackedWidget, QTextEdit,
+                             QMessageBox, QLabel, QPushButton)
+from PyQt6.QtCore import pyqtSlot, QSize, Qt, QTimer
+from PyQt6.QtGui import QGuiApplication, QIcon, QPixmap, QPainter, QColor
 import logging
 import os
+
+from core.utils import get_resource_path
+from database.db_manager import DBManager
 
 from gui.tabs.response_tab import ResponseTab
 from gui.tabs.activity_tab import ActivityTab
@@ -41,13 +45,39 @@ class MainWindow(QMainWindow):
         self.sidebar.setFrameShape(QListWidget.Shape.NoFrame)
         self.sidebar.currentRowChanged.connect(self.change_page)
 
+        self.sidebar.setIconSize(QSize(20, 20))
         menu_items = ["Отклики", "Активность", "Тесты", "Статистика", "Настройки", "Диагностика", "Обновления", "О приложении"]
-        for item in menu_items: self.sidebar.addItem(item)
+        self.menu_icon_files = ["menu_otkliki.svg", "menu_activity.svg", "menu_tests.svg",
+                                "menu_stats.svg", "menu_settings.svg", "menu_diagnostics.svg",
+                                "menu_updates.svg", "menu_about.svg"]
+        for text in menu_items:
+            self.sidebar.addItem(QListWidgetItem(text))
+        self._update_menu_icons(0)
 
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(20, 20, 20, 20)
         right_layout.setSpacing(20)
+
+        # === СТАТУС-ХЕДЕР ===
+        self.header = QWidget()
+        self.header.setObjectName("header")
+        header_layout = QHBoxLayout(self.header)
+        header_layout.setContentsMargins(18, 12, 18, 12)
+        self.header_profile = QLabel("Профиль: —")
+        self.header_profile.setStyleSheet("font-weight: 700; color: #cdd6f4;")
+        self.header_stats = QLabel("Откликов сегодня: 0 / 0")
+        self.header_stats.setStyleSheet("color: #a6adc8;")
+        self.header_status = QLabel("● Ожидание")
+        self.header_status.setStyleSheet("color: #6c7086; font-weight: 700;")
+        header_layout.addWidget(self.header_profile)
+        header_layout.addStretch()
+        header_layout.addWidget(self.header_stats)
+        header_layout.addSpacing(18)
+        header_layout.addWidget(self.header_status)
+        right_layout.addWidget(self.header)
+
+        self.db = DBManager()
 
         self.pages = QStackedWidget()
         self.response_tab = ResponseTab()
@@ -70,6 +100,19 @@ class MainWindow(QMainWindow):
 
         right_layout.addWidget(self.pages)
 
+        # Заголовок лога + очистка
+        log_header = QHBoxLayout()
+        log_title = QLabel("Лог")
+        log_title.setStyleSheet("color: #89b4fa; font-weight: 800; font-size: 13px;")
+        btn_clear_log = QPushButton("Очистить")
+        btn_clear_log.setObjectName("ghost")
+        btn_clear_log.setFixedHeight(28)
+        btn_clear_log.clicked.connect(lambda: self.log_area.clear())
+        log_header.addWidget(log_title)
+        log_header.addStretch()
+        log_header.addWidget(btn_clear_log)
+        right_layout.addLayout(log_header)
+
         self.log_area = QTextEdit()
         self.log_area.setReadOnly(True)
         self.log_area.setMinimumHeight(90);
@@ -86,15 +129,75 @@ class MainWindow(QMainWindow):
 
         self.response_tab.start_btn.clicked.connect(self.on_response_start)
         self.response_tab.profile_combo.currentTextChanged.connect(self.update_response_btn)
+        self.response_tab.profile_combo.currentTextChanged.connect(self.update_header)
         self.activity_tab.start_btn.clicked.connect(self.on_activity_start)
         self.activity_tab.profile_combo.currentTextChanged.connect(self.update_activity_btn)
+        self.activity_tab.profile_combo.currentTextChanged.connect(self.update_header)
+
+        # Периодическое обновление статус-хедера
+        self.header_timer = QTimer(self)
+        self.header_timer.timeout.connect(self.update_header)
+        self.header_timer.start(2500)
 
         self.load_styles()
         self.sidebar.setCurrentRow(0)
+        self.update_header()
         self.logger.info("Интерфейс инициализирован.")
+
+    def _tint_icon(self, filename, hex_color, size=20):
+        """Загружает SVG и перекрашивает его в hex_color (по альфе)."""
+        path = get_resource_path(os.path.join("resources", "icons", filename))
+        src = QIcon(path).pixmap(QSize(size, size))
+        if src.isNull():
+            return QIcon()
+        result = QPixmap(src.size())
+        result.fill(Qt.GlobalColor.transparent)
+        p = QPainter(result)
+        p.drawPixmap(0, 0, src)
+        p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+        p.fillRect(result.rect(), QColor(hex_color))
+        p.end()
+        return QIcon(result)
+
+    def _update_menu_icons(self, selected):
+        """Активный пункт — тёмная иконка (на светлом градиенте), остальные — серые."""
+        for i, fn in enumerate(self.menu_icon_files):
+            color = "#11111b" if i == selected else "#a6adc8"
+            item = self.sidebar.item(i)
+            if item:
+                item.setIcon(self._tint_icon(fn, color))
+
+    def update_header(self):
+        """Обновляет статус-хедер: профиль активной вкладки, отклики сегодня, статус."""
+        idx = self.pages.currentIndex()
+        if idx == 1:
+            profile = self.activity_tab.profile_combo.currentText()
+        else:
+            profile = self.response_tab.profile_combo.currentText()
+        self.header_profile.setText(f"Профиль: {profile or '—'}")
+
+        try:
+            _total, today = self.db.get_stats(profile or None)
+        except Exception:
+            today = 0
+        try:
+            limit = int(self.settings_tab.settings_mgr.get("limit_applications") or 0)
+        except Exception:
+            limit = 0
+        self.header_stats.setText(f"Откликов сегодня: {today} / {limit}")
+
+        running = bool(self.search_workers) or bool(self.activity_workers)
+        if running:
+            self.header_status.setText("● Работает")
+            self.header_status.setStyleSheet("color: #a6e3a1; font-weight: 800;")
+        else:
+            self.header_status.setText("● Ожидание")
+            self.header_status.setStyleSheet("color: #6c7086; font-weight: 700;")
 
     def change_page(self, index):
         self.pages.setCurrentIndex(index)
+        self._update_menu_icons(index)
+        self.update_header()
         if index == 0:
             self.response_tab.refresh_profiles()
         elif index == 1:
@@ -133,11 +236,13 @@ class MainWindow(QMainWindow):
         self.search_workers[profile] = worker
         worker.start()
         self.update_response_btn()
+        self.update_header()
 
     def handle_response_finished(self, status, profile):
         if profile in self.search_workers: del self.search_workers[profile]
         self.response_tab.start_btn.setEnabled(True)
         self.update_response_btn()
+        self.update_header()
 
         # === ДОБАВЛЕНО: ОБРАБОТКА СТОП ===
         if status == "finished":
@@ -182,11 +287,13 @@ class MainWindow(QMainWindow):
         self.activity_workers[profile] = worker
         worker.start()
         self.update_activity_btn()
+        self.update_header()
 
     def handle_activity_finished(self, status, profile):
         if profile in self.activity_workers: del self.activity_workers[profile]
         self.activity_tab.start_btn.setEnabled(True)
         self.update_activity_btn()
+        self.update_header()
 
         # === ДОБАВЛЕНО: ОБРАБОТКА СТОП ===
         if status == "finished":

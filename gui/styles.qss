@@ -20,6 +20,14 @@ QToolTip {
     padding: 6px 10px;
 }
 
+/* Статус-хедер */
+#header {
+    background-color: rgba(30, 30, 46, 0.55);
+    border: 1px solid #26263a;
+    border-radius: 12px;
+}
+#header QLabel { font-size: 13px; }
+
 /* Контейнеры прокрутки — чтобы фон не «протекал» из системной темы */
 QScrollArea, #scroll_content {
     background: transparent;
@@ -207,6 +215,21 @@ QPushButton:pressed {
 QPushButton:disabled {
     background: #313244;
     color: #6c7086;
+}
+
+/* Вторичная (ghost) кнопка */
+QPushButton#ghost {
+    background: transparent;
+    color: #a6adc8;
+    border: 1px solid #45475a;
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 4px 14px;
+}
+QPushButton#ghost:hover {
+    border: 1px solid #89b4fa;
+    color: #cdd6f4;
+    background: rgba(137, 180, 250, 0.08);
 }
 
 /* Опасные действия */
