@@ -35,11 +35,6 @@ class ActivityTab(QWidget):
         self.profile_combo.setMinimumHeight(40)
         top_layout.addWidget(self.profile_combo, 1)
 
-        btn_refresh = QPushButton("↻")
-        btn_refresh.setFixedSize(40, 40)
-        btn_refresh.clicked.connect(self.refresh_profiles)
-        top_layout.addWidget(btn_refresh)
-
         top_group.setLayout(top_layout)
         layout.addWidget(top_group)
 
