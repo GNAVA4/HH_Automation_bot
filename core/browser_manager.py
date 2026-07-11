@@ -1,6 +1,7 @@
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 import time
 import random
+import re
 import logging
 import json
 import os
@@ -10,7 +11,6 @@ from difflib import SequenceMatcher  # Нужен для умного поиск
 from database.db_manager import DBManager
 from core.settings_manager import SettingsManager
 from core.humanizer import HumanLike
-from core.config import HEADLESS_MODE
 from core.utils import get_user_data_path, get_resource_path
 
 logger = logging.getLogger("HH_Automation_bot")
@@ -85,12 +85,12 @@ class BrowserEngine:
         if not os.path.exists(profiles_dir): os.makedirs(profiles_dir)
         state_path = os.path.abspath(os.path.join(profiles_dir, f"{self.profile_name}.json"))
 
-        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+        # UA не переопределяем: channel="chrome" запускает реальный Chrome,
+        # его родной User-Agent всегда совпадает с версией движка (иначе — маркер бота).
         viewport = {'width': 1920, 'height': 1080} if is_headless else None
 
         context_options = {
             "viewport": viewport,
-            "user_agent": user_agent,
             "locale": "ru-RU",
             "timezone_id": "Europe/Moscow",
             "permissions": ["geolocation", "notifications"]
@@ -138,12 +138,14 @@ class BrowserEngine:
                         })();
                     """)
         page.add_init_script("window.chrome = { runtime: {} };")
-        page.add_init_script("Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });")
 
     def _check_auth_status(self):
         try:
-            if self.page.locator("[data-qa='account-signup-submit']").is_visible(): return False
-            if self.page.locator("[data-qa='login']").is_visible(): return False
+            auth = self.locators.get("auth", {})
+            if self.page.locator(auth.get("signup_submit", "[data-qa='account-signup-submit']")).is_visible():
+                return False
+            if self.page.locator(auth.get("login_btn", "[data-qa='login']")).is_visible():
+                return False
             return True
         except:
             return True
@@ -233,13 +235,27 @@ class BrowserEngine:
                     else:
                         vacancy.scroll_into_view_if_needed()
 
-                    title_el = vacancy.locator("a[data-qa='serp-item__title']").first
-                    company_el = vacancy.locator("a[data-qa='vacancy-serp__vacancy-employer']").first
+                    search_locators = self.locators.get("search_page", {})
+                    title_el = vacancy.locator(search_locators.get("vacancy_title", "a[data-qa='serp-item__title']")).first
+                    company_el = vacancy.locator(search_locators.get("vacancy_employer", "a[data-qa='vacancy-serp__vacancy-employer']")).first
                     title = title_el.text_content() if title_el.is_visible() else "Vacancy"
                     company = company_el.text_content().replace('\u00a0', ' ') if company_el.is_visible() else "Company"
                     url = title_el.get_attribute("href") if title_el.is_visible() else ""
 
-                    apply_btn = vacancy.locator(self.locators["search_page"]["apply_button"]).first
+                    # Пропуск, если HH уже пометил карточку как откликнутую
+                    already_sel = search_locators.get("already_applied")
+                    if already_sel:
+                        already = vacancy.locator(already_sel)
+                        if already.count() > 0 and already.first.is_visible():
+                            continue
+
+                    # Пропуск, если по этой вакансии уже был отклик (экономим суточный лимит)
+                    m = re.search(r"/vacancy/(\d+)", url or "")
+                    if m and self.db.has_applied(m.group(1), self.profile_name):
+                        self.log(f"Уже откликались, пропуск: {title}")
+                        continue
+
+                    apply_btn = vacancy.locator(search_locators.get("apply_button", "[data-qa='vacancy-serp__vacancy_response']")).first
                     if not apply_btn.is_visible(): continue
 
                     self.log(f"[{count_processed + 1}/{limit}] {title} ({company})")
@@ -323,7 +339,8 @@ class BrowserEngine:
 
     def handle_response_modal(self, data, info):
         try:
-            modal = self.page.locator("div[role='dialog']")
+            modal_locators = self.locators.get("response_modal", {})
+            modal = self.page.locator(modal_locators.get("dialog", "div[role='dialog']"))
 
             # --- ВЕРНУЛ ЛОГИКУ УМНОГО ПОИСКА ---
             target_resume = data.get("resume_name", "").strip()
@@ -332,7 +349,7 @@ class BrowserEngine:
 
             used_resume_name = "Default"
 
-            curr_header = modal.locator("[data-qa='resume-title']").first
+            curr_header = modal.locator(modal_locators.get("resume_trigger", "[data-qa='resume-title']")).first
 
             if curr_header.is_visible():
                 current_text = curr_header.text_content().strip()
@@ -385,7 +402,7 @@ class BrowserEngine:
                     # Но выше мы его открывали.
 
                     # Ищем опцию
-                    options = self.page.locator("[data-magritte-select-option]").all()
+                    options = self.page.locator(modal_locators.get("resume_option", "[data-magritte-select-option]")).all()
                     found = False
                     for opt in options:
                         txt = opt.text_content().strip()
@@ -411,8 +428,8 @@ class BrowserEngine:
             if text:
                 final_text = text.replace("{company}", info['company']).replace("{vacancy}", info['title']).replace(
                     "{name}", self.profile_name)
-                area = modal.locator("textarea").first
-                btn = modal.locator("[data-qa='add-cover-letter']").first
+                area = modal.locator(modal_locators.get("letter_input", "textarea")).first
+                btn = modal.locator(modal_locators.get("add_letter_btn", "[data-qa='add-cover-letter']")).first
                 if not area.is_visible() and btn.is_visible(): btn.click(); self.smart_sleep(0.3)
                 if area.is_visible():
                     if self.human and self.settings_mgr.get("use_human_moves"):
@@ -420,8 +437,8 @@ class BrowserEngine:
                     else:
                         area.fill(final_text)
 
-            submit = modal.locator("[data-qa='vacancy-response-submit-popup']").first
-            if not submit.is_visible(): submit = modal.locator("button[type='submit']").first
+            submit = modal.locator(modal_locators.get("submit_btn", "[data-qa='vacancy-response-submit-popup']")).first
+            if not submit.is_visible(): submit = modal.locator(modal_locators.get("submit_btn_alt", "button[type='submit']")).first
             if submit.is_visible():
                 submit.click()
                 try:
@@ -429,13 +446,17 @@ class BrowserEngine:
                     return used_resume_name
                 except:
                     return False
-        except:
+        except InterruptedError:
+            raise
+        except Exception as e:
+            if "Target closed" in str(e) or "browser has been closed" in str(e): raise
             return False
         return False
 
     def run_resume_update(self):
         self.log("=== ПОДНЯТИЕ РЕЗЮМЕ ===")
         consecutive_errors = 0
+        activity_locators = self.locators.get("activity", {})
         try:
             self.page.goto("https://hh.ru/applicant/resumes?hhtmFrom=main&hhtmFromLabel=header")
             self.page.wait_for_load_state("domcontentloaded")
@@ -444,7 +465,7 @@ class BrowserEngine:
             while True:
                 self.check_running()
                 try:
-                    all_buttons = self.page.locator(self.locators["activity"]["resume_update_btn"]).all()
+                    all_buttons = self.page.locator(activity_locators.get("resume_update_btn", "button[data-qa*='resume-update-button']")).all()
                     consecutive_errors = 0
                 except Exception as e:
                     if "Target closed" in str(e) or "browser has been closed" in str(e): raise e
@@ -469,7 +490,7 @@ class BrowserEngine:
                     button_to_click.scroll_into_view_if_needed()
                     button_to_click.click()
                     self.smart_sleep(2)
-                    close_btn = self.page.locator(self.locators["activity"]["resume_modal_close"])
+                    close_btn = self.page.locator(activity_locators.get("resume_modal_close", "button[data-qa='bot-update-resume-modal__close-button']"))
                     if close_btn.is_visible(): close_btn.click(); self.smart_sleep(1)
                     self.smart_sleep(2)
                 except Exception as e:
@@ -486,19 +507,21 @@ class BrowserEngine:
         try:
             if "hh.ru" not in self.page.url: self.page.goto("https://hh.ru")
 
+            activity_locators = self.locators.get("activity", {})
+
             try:
-                self.page.locator(self.locators["activity"]["chat_open_btn"]).click(force=True)
+                self.page.locator(activity_locators.get("chat_open_btn", "[data-qa='chatikActivator-button']")).click(force=True)
             except:
                 self.log("Кнопка чатов не найдена", "error"); return
 
-            iframe_sel = self.locators["activity"]["chat_iframe"]
+            iframe_sel = activity_locators.get("chat_iframe", "iframe.chatik-integration-iframe")
             try:
                 self.page.wait_for_selector(iframe_sel, timeout=10000)
             except:
                 self.log("Iframe не открылся", "error"); return
             frame = self.page.frame_locator(iframe_sel)
 
-            list_sel = self.locators["activity"]["chat_list_item"]
+            list_sel = activity_locators.get("chat_list_item", "a[data-qa*='chatik-open-chat-']")
             try:
                 frame.locator(list_sel).first.wait_for(timeout=10000)
             except:
@@ -519,13 +542,14 @@ class BrowserEngine:
                     self.smart_sleep(3)
 
                     try:
-                        employer_name = frame.locator(".title--jaEO2q2if2IOwiyO").first.text_content()
+                        employer_name_selector = activity_locators.get("employer_name", ".title--jaEO2q2if2IOwiyO")
+                        employer_name = frame.locator(employer_name_selector).first.text_content()
                     except:
                         employer_name = "HR"
 
-                    input_area = frame.locator(self.locators["activity"]["chat_input"])
+                    input_area = frame.locator(activity_locators.get("chat_input", "textarea[data-qa='chatik-new-message-text']"))
                     if not input_area.is_visible():
-                        back = frame.locator(self.locators["activity"]["chat_back_btn"])
+                        back = frame.locator(activity_locators.get("chat_back_btn", "button[data-qa='chatik-back-to-chats-button']"))
                         if back.is_visible(): back.click()
                         processed += 1;
                         continue
@@ -542,10 +566,10 @@ class BrowserEngine:
                             else:
                                 input_area.fill(msg)
                             self.smart_sleep(0.5)
-                            send = frame.locator(self.locators["activity"]["chat_send_btn"])
+                            send = frame.locator(activity_locators.get("chat_send_btn", "button[data-qa='chatik-do-send-message']"))
                             if send.is_visible(): send.click(force=True); self.smart_sleep(2)
 
-                    back = frame.locator(self.locators["activity"]["chat_back_btn"])
+                    back = frame.locator(activity_locators.get("chat_back_btn", "button[data-qa='chatik-back-to-chats-button']"))
                     if back.is_visible(): back.click()
                     processed += 1
                     consecutive_errors = 0
