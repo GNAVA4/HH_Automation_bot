@@ -7,6 +7,7 @@ import logging
 import os
 
 from core.utils import get_resource_path
+from core.config import CURRENT_VERSION
 from database.db_manager import DBManager
 
 from gui.tabs.response_tab import ResponseTab
@@ -25,7 +26,7 @@ from gui.tabs.updates_tab import UpdatesTab
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("HH Automation Bot v3.5")
+        self.setWindowTitle(f"HH Automation Bot v{CURRENT_VERSION}")
 
         screen = QGuiApplication.primaryScreen().availableGeometry()
         width = int(screen.width() * 0.55)
