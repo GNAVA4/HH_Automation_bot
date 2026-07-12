@@ -28,6 +28,7 @@ class BrowserEngine:
         self.test_solver = None
         self.last_search_url = None
         self.current_page = 0
+        self.attempted_ids = set()
 
         self.settings_mgr = SettingsManager()
         self.profile_name = profile_name if profile_name else self.settings_mgr.get("current_profile")
@@ -94,7 +95,10 @@ class BrowserEngine:
 
         # UA не переопределяем: channel="chrome" запускает реальный Chrome,
         # его родной User-Agent всегда совпадает с версией движка (иначе — маркер бота).
-        viewport = {'width': 1920, 'height': 1080} if is_headless else None
+        # Фиксированный логический viewport и в headed-режиме: на маленьком экране
+        # (напр. 1280x720) футер модалки с кнопкой «Откликнуться» иначе уходит ниже
+        # видимой зоны, клик не проходит (а force-клик попадал в фон и закрывал окно).
+        viewport = {'width': 1600, 'height': 1000}
 
         context_options = {
             "viewport": viewport,
@@ -190,6 +194,7 @@ class BrowserEngine:
         full_url = f"{base_url}?{urlencode(query_params)}"
         self.last_search_url = full_url
         self.current_page = 0
+        self.attempted_ids = set()
         self.log(f"Поиск: {full_url}")
 
         try:
@@ -260,13 +265,21 @@ class BrowserEngine:
 
                     # Пропуск, если по этой вакансии уже был отклик (экономим суточный лимит)
                     m = re.search(r"/vacancy/(\d+)", url or "")
-                    if m and self.db.has_applied(m.group(1), self.profile_name):
+                    vac_id = m.group(1) if m else None
+                    if vac_id and self.db.has_applied(vac_id, self.profile_name):
                         self.log(f"Уже откликались, пропуск: {title}")
+                        continue
+
+                    # Пропуск уже опробованных В ЭТОМ запуске (в т.ч. неудачных) — иначе
+                    # карточка с тестом/редиректом, которая не завершилась, крутит цикл вечно.
+                    if vac_id and vac_id in self.attempted_ids:
                         continue
 
                     apply_btn = vacancy.locator(search_locators.get("apply_button", "[data-qa='vacancy-serp__vacancy_response']")).first
                     if not apply_btn.is_visible(): continue
 
+                    if vac_id:
+                        self.attempted_ids.add(vac_id)
                     self.log(f"[{count_processed + 1}/{limit}] {title} ({company})")
 
                     self._try_handle_overlays()
@@ -387,7 +400,7 @@ class BrowserEngine:
             if opts.count() > 0 and opts.first.is_visible():
                 trg = self.page.locator("[data-qa='resume-title']").first
                 if trg.count() > 0 and trg.is_visible():
-                    trg.click(force=True)
+                    trg.click(force=True, timeout=4000)
                     self.smart_sleep(0.3)
         except Exception:
             pass
@@ -434,10 +447,11 @@ class BrowserEngine:
         try:
             submit.click(timeout=4000)
             return True
-        except Exception:
-            # Честный клик не прошёл (обычно кнопка ниже видимой зоны). Логируем причину
-            # и жмём JS-кликом ПО САМОЙ КНОПКЕ. НЕ используем force-клик по координатам —
-            # если кнопка за вьюпортом, он попадает в фон и ЗАКРЫВАЕТ модалку без отправки.
+        except Exception as e:
+            # Честный клик не прошёл. Логируем ТОЧНУЮ причину и жмём JS-кликом ПО САМОЙ
+            # КНОПКЕ. НЕ используем force-клик по координатам — если кнопка за вьюпортом,
+            # он попадает в фон и ЗАКРЫВАЕТ модалку без отправки.
+            self.log(f"Клик по кнопке не прошёл: {str(e).splitlines()[0][:140]}", "warning")
             self._submit_diag()
             self._collapse_resume_list()
             try:
@@ -468,8 +482,9 @@ class BrowserEngine:
 
                 # 1. Если включен Умный поиск
                 if use_smart:
-                    # Раскрываем список
-                    curr_header.click(force=True)
+                    # Раскрываем список (таймаут, чтобы «Стоп» не подвисал на 30с)
+                    self.check_running()
+                    curr_header.click(force=True, timeout=4000)
                     self.smart_sleep(0.8)
                     options = self.page.locator("[data-magritte-select-option]").all()
 
@@ -500,7 +515,8 @@ class BrowserEngine:
                 # 2. Если Умный выключен, но задано дефолтное
                 elif target_resume and target_resume.lower() not in current_text.lower():
                     self.log(f"Смена резюме: {current_text} -> {target_resume}")
-                    curr_header.click(force=True)
+                    self.check_running()
+                    curr_header.click(force=True, timeout=4000)
                     self.smart_sleep(0.8)
                     target_to_click = target_resume
 
@@ -514,10 +530,12 @@ class BrowserEngine:
                     options = self.page.locator(modal_locators.get("resume_option", "[data-magritte-select-option]")).all()
                     found = False
                     for opt in options:
+                        self.check_running()
                         txt = opt.text_content().strip()
                         if target_to_click.lower() in txt.lower():
-                            opt.scroll_into_view_if_needed()
-                            opt.click(force=True)
+                            try: opt.scroll_into_view_if_needed(timeout=3000)
+                            except Exception: pass
+                            opt.click(force=True, timeout=4000)
                             used_resume_name = txt
                             found = True
                             self.smart_sleep(0.5)
@@ -528,7 +546,7 @@ class BrowserEngine:
                         # Проверяем, открыт ли список. Косвенно - если опции видны.
                         try:
                             if options and options[0].is_visible():
-                                curr_header.click(force=True)
+                                curr_header.click(force=True, timeout=4000)
                         except:
                             pass
 
@@ -575,15 +593,16 @@ class BrowserEngine:
             self._collapse_resume_list()
 
             submit = modal.locator(modal_locators.get("submit_btn", "[data-qa='vacancy-response-submit-popup']")).first
-            if not submit.is_visible(): submit = modal.locator(modal_locators.get("submit_btn_alt", "button[type='submit']")).first
+            if not submit.is_visible():
+                submit = modal.locator(modal_locators.get("submit_btn_alt", "button[type='submit']")).first
             if submit.is_visible():
-                if not self._click_submit(submit):
-                    return False
+                submit.click()
                 try:
                     modal.wait_for(state="hidden", timeout=5000)
                     return used_resume_name
-                except:
+                except Exception:
                     return False
+            return False
         except InterruptedError:
             raise
         except Exception as e:
@@ -609,7 +628,8 @@ class BrowserEngine:
                 return used  # оставляем преселект
 
             vacancy_title = (info.get("title") or "").lower()
-            trigger.click(force=True)
+            self.check_running()
+            trigger.click(force=True, timeout=4000)
             self.smart_sleep(0.6)
             options = page.locator("[data-magritte-select-option]").all()
             if not options:
@@ -642,8 +662,8 @@ class BrowserEngine:
             for o, t in zip(options, texts):
                 if target_text.lower() in t.lower():
                     try:
-                        o.scroll_into_view_if_needed()
-                        o.click(force=True)
+                        o.scroll_into_view_if_needed(timeout=3000)
+                        o.click(force=True, timeout=4000)
                         used = t
                         self.smart_sleep(0.4)
                     except Exception:
@@ -655,6 +675,8 @@ class BrowserEngine:
             except Exception:
                 pass
             return used
+        except InterruptedError:
+            raise
         except Exception:
             return used
 
@@ -693,10 +715,18 @@ class BrowserEngine:
                           or "Здравствуйте! Заинтересован в вашей вакансии, готов обсудить детали.")
             try:
                 toggle = page.locator(loc.get("letter_toggle", "[data-qa='vacancy-response-letter-toggle']")).first
-                if toggle.count() > 0 and toggle.is_visible():
-                    toggle.click(force=True)
-                    self.smart_sleep(0.5)
+                if toggle.count() > 0:
+                    # Страница теста длинная — кнопка «добавить сопроводительное» обычно ниже
+                    # вьюпорта, force-клик без скролла в неё не попадает. Скроллим к ней.
+                    try: toggle.scroll_into_view_if_needed(timeout=3000)
+                    except Exception: pass
+                    if toggle.is_visible():
+                        toggle.click(force=True)
+                        self.smart_sleep(0.5)
                 area = page.locator(loc.get("letter_input", "[data-qa='vacancy-response-popup-form-letter-input']")).first
+                if area.count() > 0:
+                    try: area.scroll_into_view_if_needed(timeout=3000)
+                    except Exception: pass
                 if area.count() > 0 and area.is_visible():
                     area.fill(letter)
                 else:
