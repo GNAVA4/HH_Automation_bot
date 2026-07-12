@@ -73,8 +73,11 @@ class BrowserEngine:
             "--disable-dev-shm-usage",
             "--no-first-run",
             "--no-zygote",
-            "--hide-scrollbars",
             "--mute-audio",
+            # Разворачиваем окно, чтобы футер модалки с кнопкой «Откликнуться»
+            # не уходил ниже видимой зоны (иначе клик не проходит).
+            "--start-maximized",
+            "--window-size=1920,1080",
         ]
 
 
@@ -294,9 +297,18 @@ class BrowserEngine:
                             self._try_handle_overlays()
                         consecutive_errors = 0
                     else:
-                        # Не модалка -> тест работодателя или редирект
+                        # Не модалка -> тест работодателя / внешний редирект / ничего не открылось
+                        navigated = "hh.ru/search" not in self.page.url
+                        if not navigated:
+                            # Модалка не появилась и никуда не ушли (уже откликнулись /
+                            # кнопка не сработала). НЕ перезапускаем страницу — идём к след. карточке,
+                            # иначе бесконечный цикл на этой же карточке.
+                            self.log("Модалка не открылась, пропуск карточки.", "warning")
+                            consecutive_errors = 0
+                            continue
+
                         solve = self.settings_mgr.get("solve_tests") is not False
-                        if solve and ("vacancy_response" in self.page.url or "hh.ru/search" not in self.page.url):
+                        if solve and "vacancy_response" in self.page.url:
                             info = {"title": title, "company": company}
                             used_resume = self.handle_test_page(data, info)
                             if used_resume:
@@ -306,10 +318,10 @@ class BrowserEngine:
                             else:
                                 self.log("Тест не пройден/пропущен.", "warning")
                         else:
-                            self.log("Тест/Редирект. Пропуск.", "warning")
+                            self.log("Внешний редирект. Пропуск.", "warning")
 
-                        # Возврат к выдаче на ТУ ЖЕ страницу (карточки устарели -> переобход)
-                        if self.last_search_url and "hh.ru/search" not in self.page.url:
+                        # Ушли со страницы -> вернёмся к выдаче на ту же страницу (карточки устарели)
+                        if self.last_search_url:
                             try:
                                 back_url = self.last_search_url
                                 if self.current_page > 0:
@@ -391,19 +403,45 @@ class BrowserEngine:
             except Exception:
                 pass
 
+    def _submit_diag(self):
+        """Диагностика: почему кнопка отправки не нажимается (disabled/перекрытие)."""
+        try:
+            info = self.page.evaluate(r"""() => {
+                const m = document.querySelector("div[role='dialog']") || document;
+                const b = m.querySelector("[data-qa='vacancy-response-submit-popup']") || m.querySelector("button[type='submit']");
+                if (!b) return {btn: 'нет'};
+                const r = b.getBoundingClientRect();
+                const t = document.elementFromPoint(r.left + r.width/2, r.top + r.height/2);
+                const areas = Array.from(m.querySelectorAll('textarea')).map(a => ({dq: a.getAttribute('data-qa'), len: (a.value||'').length, vis: a.offsetParent!==null}));
+                const cbs = Array.from(m.querySelectorAll("input[type='checkbox']")).map(c => ({dq: c.getAttribute('data-qa'), checked: c.checked, req: c.required}));
+                return {disabled: b.disabled, visible: b.offsetParent!==null,
+                        topmost: t ? (t.tagName + (t.getAttribute('data-qa') ? '['+t.getAttribute('data-qa')+']' : '')) : null,
+                        textareas: areas, checkboxes: cbs};
+            }""")
+            self.log(f"ДИАГ отправки: {info}", "warning")
+        except Exception:
+            pass
+
     def _click_submit(self, submit):
         """Клик по кнопке отправки: сначала свернуть список резюме и убрать оверлеи,
         затем клик с коротким таймаутом и force-фолбэком (без 30-сек зависания)."""
         self._collapse_resume_list()
         self._dismiss_cookie()
         try:
+            submit.scroll_into_view_if_needed(timeout=2500)
+        except Exception:
+            pass
+        try:
             submit.click(timeout=4000)
             return True
         except Exception:
-            # перекрыто — ещё раз свернём список и форсируем
+            # Честный клик не прошёл (обычно кнопка ниже видимой зоны). Логируем причину
+            # и жмём JS-кликом ПО САМОЙ КНОПКЕ. НЕ используем force-клик по координатам —
+            # если кнопка за вьюпортом, он попадает в фон и ЗАКРЫВАЕТ модалку без отправки.
+            self._submit_diag()
             self._collapse_resume_list()
             try:
-                submit.click(force=True, timeout=4000)
+                submit.evaluate("el => el.click()")
                 return True
             except Exception:
                 return False
